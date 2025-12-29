@@ -2658,7 +2658,7 @@ end
 
 ensureCacheDir = function()
     local lfs = require("libs/libkoreader-lfs")
-    local cache_dir = DataStorage:getDataDir() .. "/cache/AppStore"
+    local cache_dir = DataStorage:getDataDir() .. "/cache/appstore"
     if lfs.attributes(cache_dir, "mode") ~= "directory" then
         lfs.mkdir(cache_dir)
     end
@@ -4409,7 +4409,7 @@ local function detectPluginFromArchive(reader, repo)
         elseif repo_name then
             plugin_dirname = sanitizePluginDirname(repo_name)
         else
-            plugin_dirname = sanitizePluginDirname("AppStore")
+            plugin_dirname = sanitizePluginDirname("appstore")
         end
     elseif (not plugin_name or plugin_name == "") then
         plugin_name = plugin_dirname:gsub("%.koplugin$", "")
