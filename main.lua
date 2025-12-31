@@ -4513,17 +4513,30 @@ extractPluginToUserDir = function(reader, info)
     end
 
     for entry in reader:iterate() do
-        if entry.mode == "file"
-            and entry.path:sub(1, #info.plugin_root + 1) == info.plugin_root .. "/" then
-            local relative = entry.path:sub(#info.plugin_root + 2)
-            local dest_path = target_dir .. "/" .. relative
-            local parent = dest_path:match("^(.*)/")
-            if parent and parent ~= "" then
-                util.makePath(parent)
-            end
-            local ok = reader:extractToPath(entry.path, dest_path)
-            if not ok then
-                return false, _("Failed to extract file: ") .. entry.path
+        if entry.mode == "file" then
+            if info.plugin_root == "" then
+                -- Rootless archive: copy every file.
+                local relative = entry.path
+                local dest_path = target_dir .. "/" .. relative
+                local parent = dest_path:match("^(.*)/")
+                if parent and parent ~= "" then
+                    util.makePath(parent)
+                end
+                local ok = reader:extractToPath(entry.path, dest_path)
+                if not ok then
+                    return false, _("Failed to extract file: ") .. entry.path
+                end
+            elseif entry.path:sub(1, #info.plugin_root + 1) == info.plugin_root .. "/" then
+                local relative = entry.path:sub(#info.plugin_root + 2)
+                local dest_path = target_dir .. "/" .. relative
+                local parent = dest_path:match("^(.*)/")
+                if parent and parent ~= "" then
+                    util.makePath(parent)
+                end
+                local ok = reader:extractToPath(entry.path, dest_path)
+                if not ok then
+                    return false, _("Failed to extract file: ") .. entry.path
+                end
             end
         end
     end
