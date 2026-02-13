@@ -267,6 +267,7 @@ input:focus,select:focus{border-color:var(--accent)}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 // ─── Storage abstraction (localStorage with memory fallback) ───
 const Storage = (() => {
@@ -329,7 +330,13 @@ const GitHub = {
     const cached = Storage.getJSON(cacheKey);
     if (cached && cached.content && (Date.now() - cached.ts < 3600000)) return cached.content;
     const data = await this.request(`/repos/${owner}/${repo}/readme`);
-    const content = data.content ? atob(data.content.replace(/\n/g, '')) : '';
+    let content = '';
+    if (data.content) {
+      const bin = atob(data.content.replace(/\n/g, ''));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      content = new TextDecoder('utf-8').decode(bytes);
+    }
     Storage.setJSON(cacheKey, { content, ts: Date.now() });
     return content;
   },
@@ -341,37 +348,30 @@ const GitHub = {
   }
 };
 
-// ─── Simple Markdown → HTML ───
-function md2html(md) {
+// ─── Markdown → HTML (via marked.js) ───
+function md2html(md, owner, repo) {
   if (!md) return '';
-  let html = md;
-  // Code blocks
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${esc(code.trim())}</code></pre>`);
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // Images (before links)
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" loading="lazy">');
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  // Headers
-  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  // Bold & italic
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  // Blockquote
-  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-  // Horizontal rule
-  html = html.replace(/^---+$/gm, '<hr>');
-  // Unordered list
-  html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
-  // Paragraphs (lines not already tags)
-  html = html.replace(/^(?!<[a-z])((?!<\/|<li|<h[1-6]|<pre|<block|<hr|<img|<ul|<ol).+)$/gm, '<p>$1</p>');
-  // Wrap consecutive <li> in <ul>
-  html = html.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
-  return html;
+  const baseRaw = (owner && repo) ? `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/` : '';
+  const baseLink = (owner && repo) ? `https://github.com/${owner}/${repo}/blob/HEAD/` : '';
+  const renderer = new marked.Renderer();
+  renderer.image = function({ href, title, text }) {
+    if (baseRaw && href && !href.match(/^https?:\/\//)) href = baseRaw + href;
+    const t = title ? ` title="${esc(title)}"` : '';
+    return `<img src="${esc(href)}" alt="${esc(text)}"${t} loading="lazy" style="max-width:100%">`;
+  };
+  renderer.link = function({ href, title, text }) {
+    if (baseLink && href && !href.match(/^https?:\/\//) && !href.startsWith('#')) href = baseLink + href;
+    const t = title ? ` title="${esc(title)}"` : '';
+    return `<a href="${esc(href)}"${t} target="_blank" rel="noopener">${text}</a>`;
+  };
+  renderer.html = function({ text }) {
+    if (baseRaw) {
+      return text.replace(/(<img\s[^>]*src=["'])(?!https?:\/\/)([^"']+)(["'])/gi,
+        (m, pre, url, post) => pre + baseRaw + url + post);
+    }
+    return text;
+  };
+  return marked.parse(md, { renderer, gfm: true, breaks: false });
 }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -780,7 +780,7 @@ const app = {
 
     try {
       const content = await GitHub.fetchReadme(owner, repo);
-      contentEl.innerHTML = md2html(content);
+      contentEl.innerHTML = md2html(content, owner, repo);
     } catch (e) {
       contentEl.innerHTML = `<div class="state-msg"><p>Failed to load README: ${esc(e.message)}</p></div>`;
     }
