@@ -686,17 +686,15 @@ const app = {
       list = list.filter(r => (r.stargazers_count || 0) >= s.minStars);
     }
     if (!s.query) return list;
-    const q = s.query;
+    const words = s.query.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return list;
     return list.filter(r => {
       const name = (r.full_name || '').toLowerCase();
       const desc = (r.description || '').toLowerCase();
       const topics = (r.topics || []).join(' ').toLowerCase();
-      if (name.includes(q) || desc.includes(q) || topics.includes(q)) return true;
-      if (s.readmeSearch) {
-        const readme = this.readmeCache[r.full_name];
-        if (readme && readme.includes(q)) return true;
-      }
-      return false;
+      const readmeTxt = s.readmeSearch ? (this.readmeCache[r.full_name] || '') : '';
+      const haystack = name + ' ' + desc + ' ' + topics + (readmeTxt ? ' ' + readmeTxt : '');
+      return words.every(w => haystack.includes(w));
     });
   },
 
