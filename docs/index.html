@@ -156,6 +156,11 @@ input:focus,select:focus{border-color:var(--accent)}
 .readme-content th,.readme-content td{border:1px solid var(--border);padding:.4rem .6rem;text-align:left;font-size:.85rem}
 .readme-content th{background:var(--bg3)}
 
+/* Toast */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(120%);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.6rem 1.2rem;font-size:.82rem;color:var(--text2);box-shadow:var(--shadow);z-index:300;opacity:0;transition:transform .3s ease,opacity .3s ease;pointer-events:none;max-width:90vw;text-align:center}
+.toast.visible{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
+.toast .toast-icon{margin-right:.4rem}
+
 /* Responsive */
 @media(max-width:600px){
   .header{padding:.75rem 1rem}
@@ -223,6 +228,7 @@ input:focus,select:focus{border-color:var(--accent)}
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
 <div class="stats-bar" id="statsBar"></div>
 <div class="repo-list" id="repoList"></div>
 
@@ -541,6 +547,8 @@ const app = {
     this.loadCachedData();
     if (!this.data.plugins && !this.data.patches) {
       this.refreshData();
+    } else if (this.ts.readmeSearch && this.ts.query) {
+      this.applyFilter();
     } else {
       this.render();
     }
@@ -620,7 +628,11 @@ const app = {
     }
 
     this.loading[active] = false;
-    this.render();
+    if (this.ts.readmeSearch && this.ts.query) {
+      this.applyFilter();
+    } else {
+      this.render();
+    }
   },
 
   switchTab(tab) {
@@ -731,6 +743,15 @@ const app = {
     this.render();
   },
 
+  toastTimer: null,
+  showToast(msg, duration = 5000) {
+    const el = document.getElementById('toast');
+    el.innerHTML = msg;
+    el.classList.add('visible');
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => { el.classList.remove('visible'); this.toastTimer = null; }, duration);
+  },
+
   async fetchReadmesForSearch() {
     const repos = this.data[this.tab];
     if (!repos) return;
@@ -740,6 +761,8 @@ const app = {
     this.render();
     const BATCH = 6;
     let done = 0;
+    let errorCount = 0;
+    let toastShown = false;
     const total = pending.length;
     this.showSearchOverlay(`Searching READMEs... (0/${total})`);
     for (let i = 0; i < pending.length; i += BATCH) {
@@ -752,10 +775,17 @@ const app = {
           this.readmeCache[key] = content.toLowerCase();
         } catch (e) {
           this.readmeCache[key] = '';
+          errorCount++;
+          if (!toastShown) {
+            toastShown = true;
+            const hasToken = !!(Storage.get('github_pat') || '').trim();
+            const hint = hasToken ? '' : ' Add a token in ⚙️ Settings to increase the limit.';
+            this.showToast(`<span class="toast-icon">⚠️</span>Some README fetches failed (rate limit likely).${hint}`, 6000);
+          }
         }
         this.readmeLoading[key] = false;
         done++;
-        document.getElementById('searchOverlayText').textContent = `Searching READMEs... (${done}/${total})`;
+        document.getElementById('searchOverlayText').textContent = `Searching READMEs... (${done}/${total}${errorCount ? ', ' + errorCount + ' failed' : ''})`;
       }));
       this.render();
     }
