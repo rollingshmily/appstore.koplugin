@@ -1248,7 +1248,7 @@ const app = {
     let text = `KOReader AppStore - ${this.tab.charAt(0).toUpperCase() + this.tab.slice(1)}${filterLine}\n`;
     text += `View in AppStore: ${currentUrl}\n\n`;
     text += `${toShare.length} of ${filtered.length} results${hasMore ? ' (showing first ' + count + ')' : ''}\n`;
-    text += `${'='.repeat(60)}\n\n`;
+    text += `${'='.repeat(12)}\n`;
     
     toShare.forEach((r, i) => {
       const num = `${i + 1}.`;
