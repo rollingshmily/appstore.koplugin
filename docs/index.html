@@ -91,6 +91,11 @@ input:focus,select:focus{border-color:var(--accent)}
 .btn-secondary:hover{background:var(--card-hover);border:1px solid var(--border)}
 .btn-icon{background:transparent;color:var(--text2);padding:.5rem;font-size:1.2rem;line-height:1}
 .btn-icon:hover{color:var(--text)}
+.btn-share{display:flex;align-items:center;gap:.3rem;padding:.4rem .7rem;font-size:.85rem;transition:all .2s;background:transparent;color:var(--text2);border:1px solid transparent;border-radius:var(--radius)}
+.btn-share:hover{color:var(--accent2);border-color:var(--accent);background:rgba(233,69,96,.1)}
+.btn-share.has-filter{color:var(--accent2);border-color:var(--accent)}
+.btn-share .share-icon{font-size:1.1rem}
+.btn-share .share-text{font-size:.8rem;font-weight:500}
 
 /* Stats bar */
 .stats-bar{padding:.4rem 1.5rem;color:var(--text3);font-size:.8rem;display:flex;gap:1rem;align-items:center}
@@ -164,6 +169,17 @@ input:focus,select:focus{border-color:var(--accent)}
 .toast.visible{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
 .toast .toast-icon{margin-right:.4rem}
 
+/* Share Modal */
+.share-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:1rem}
+.share-option{display:flex;align-items:center;gap:.4rem;font-size:.85rem;color:var(--text2);cursor:pointer}
+.share-option input[type="checkbox"]{cursor:pointer}
+.share-count{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;font-size:.88rem;color:var(--text2)}
+.share-count input{width:100px}
+.share-preview{background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;max-height:300px;overflow-y:auto;font-family:monospace;font-size:.8rem;white-space:pre-wrap;word-break:break-word;color:var(--text);line-height:1.5}
+.share-preview:empty::before{content:'Click "Generate Preview" to see what will be shared...';color:var(--text3);font-family:var(--font);font-style:italic}
+.share-actions{display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end}
+.share-modal-body{max-height:calc(85vh - 120px);overflow-y:auto}
+
 /* Responsive */
 @media(max-width:600px){
   .header{padding:.75rem 1rem}
@@ -181,6 +197,10 @@ input:focus,select:focus{border-color:var(--accent)}
     <h1>📚 KOReader <span>AppStore</span></h1>
     <div class="header-actions">
       <button class="btn-icon" onclick="app.refreshData()" title="Refresh">🔄</button>
+      <button class="btn-share" id="shareBtn" onclick="app.openShareModal()" title="Export/share results">
+        <span class="share-icon">🔗</span>
+        <span class="share-text">Share</span>
+      </button>
       <button class="btn-icon" id="themeToggle" onclick="app.toggleTheme()" title="Toggle theme">🌙</button>
       <button class="btn-icon" onclick="app.openSettings()" title="Settings">⚙️</button>
     </div>
@@ -273,6 +293,53 @@ input:focus,select:focus{border-color:var(--accent)}
     </div>
     <div class="modal-body">
       <div id="patchesContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h2>🔗 Share Results</h2>
+      <button class="btn-icon" onclick="app.closeShareModal()">✕</button>
+    </div>
+    <div class="modal-body share-modal-body">
+      <div class="share-count">
+        <label>Number of repositories to include:</label>
+        <input type="number" id="shareCountInput" min="1" max="100" value="10">
+      </div>
+      
+      <div style="margin-bottom:.75rem;font-size:.88rem;color:var(--text2);font-weight:500">Include fields:</div>
+      <div class="share-options">
+        <label class="share-option">
+          <input type="checkbox" id="shareFieldLink" checked>
+          <span>GitHub Link</span>
+        </label>
+        <label class="share-option">
+          <input type="checkbox" id="shareFieldStars" checked>
+          <span>⭐ Stars</span>
+        </label>
+        <label class="share-option">
+          <input type="checkbox" id="shareFieldDesc" checked>
+          <span>Description</span>
+        </label>
+        <label class="share-option">
+          <input type="checkbox" id="shareFieldFork">
+          <span>🔀 Fork Info</span>
+        </label>
+        <label class="share-option">
+          <input type="checkbox" id="shareFieldDates">
+          <span>Created/Updated</span>
+        </label>
+      </div>
+      
+      <div class="share-actions" id="shareActionButtons">
+        <button class="btn-secondary" onclick="app.generateSharePreview()">📋 Generate Preview</button>
+        <button class="btn-primary" id="shareCopyBtn" onclick="app.copyShareContent()" style="display:none">📋 Copy to Clipboard</button>
+      </div>
+      
+      <div class="share-preview" id="sharePreview"></div>
     </div>
   </div>
 </div>
@@ -606,17 +673,22 @@ const app = {
     const s = this.ts;
     const banner = document.getElementById('filterBanner');
     const text = document.getElementById('filterText');
+    const shareBtn = document.getElementById('shareBtn');
     const parts = [];
     if (s.query) parts.push(`"${s.query}"`);
     if (s.ownerFilter) parts.push(`owner: ${s.ownerFilter}`);
     if (s.minStars > 0) parts.push(`≥${s.minStars} ⭐`);
     if (!s.includeForks) parts.push('no forks');
     if (s.readmeSearch && s.query) parts.push('(+README)');
-    if (parts.length > 0) {
+    
+    const hasFilter = parts.length > 0;
+    if (hasFilter) {
       text.textContent = 'Active filter: ' + parts.join(' · ');
       banner.classList.add('visible');
+      if (shareBtn) shareBtn.classList.add('has-filter');
     } else {
       banner.classList.remove('visible');
+      if (shareBtn) shareBtn.classList.remove('has-filter');
     }
   },
 
@@ -1115,6 +1187,113 @@ const app = {
     } catch (e) {
       statusEl.innerHTML = `<span class="token-status token-fail">✕ Invalid token (${e.message})</span>`;
       if (origToken) Storage.set('github_pat', origToken); else Storage.remove('github_pat');
+    }
+  },
+
+  // ─── Share/Export ───
+  shareContent: '',
+  
+  openShareModal() {
+    const repos = this.data[this.tab];
+    if (!repos) {
+      this.showToast('No data to share. Please fetch data first.', 3000);
+      return;
+    }
+    const sorted = this.getSortedRepos(repos);
+    const filtered = this.getFilteredRepos(sorted);
+    if (filtered.length === 0) {
+      this.showToast('No results to share. Try adjusting your filters.', 3000);
+      return;
+    }
+    
+    document.getElementById('shareCountInput').value = Math.min(10, filtered.length);
+    document.getElementById('sharePreview').textContent = '';
+    document.getElementById('shareCopyBtn').style.display = 'none';
+    document.getElementById('shareModal').classList.add('open');
+  },
+  
+  closeShareModal() {
+    document.getElementById('shareModal').classList.remove('open');
+  },
+  
+  generateSharePreview() {
+    const repos = this.data[this.tab];
+    const sorted = this.getSortedRepos(repos);
+    const filtered = this.getFilteredRepos(sorted);
+    
+    const count = Math.max(1, Math.min(100, parseInt(document.getElementById('shareCountInput').value) || 10));
+    const toShare = filtered.slice(0, count);
+    const hasMore = filtered.length > count;
+    
+    const fields = {
+      link: document.getElementById('shareFieldLink').checked,
+      stars: document.getElementById('shareFieldStars').checked,
+      desc: document.getElementById('shareFieldDesc').checked,
+      fork: document.getElementById('shareFieldFork').checked,
+      dates: document.getElementById('shareFieldDates').checked,
+    };
+    
+    const s = this.ts;
+    const filterDesc = [];
+    if (s.query) filterDesc.push(`search: "${s.query}"`);
+    if (s.ownerFilter) filterDesc.push(`owner: ${s.ownerFilter}`);
+    if (s.minStars > 0) filterDesc.push(`≥${s.minStars}⭐`);
+    if (!s.includeForks) filterDesc.push('no forks');
+    if (s.readmeSearch && s.query) filterDesc.push('+README');
+    
+    const filterLine = filterDesc.length > 0 ? ` (${filterDesc.join(', ')})` : '';
+    const currentUrl = window.location.href;
+    const appStoreUrl = window.location.origin + window.location.pathname;
+    
+    let text = `KOReader AppStore - ${this.tab.charAt(0).toUpperCase() + this.tab.slice(1)}${filterLine}\n`;
+    text += `View in AppStore: ${currentUrl}\n\n`;
+    text += `${toShare.length} of ${filtered.length} results${hasMore ? ' (showing first ' + count + ')' : ''}\n`;
+    text += `${'='.repeat(60)}\n\n`;
+    
+    toShare.forEach((r, i) => {
+      const num = `${i + 1}.`;
+      text += num + ' ';
+      
+      const parts = [];
+      if (fields.link) parts.push(r.html_url);
+      if (fields.stars) parts.push(`⭐ ${r.stargazers_count || 0}`);
+      if (fields.desc && r.description) parts.push(r.description);
+      if (fields.fork && r.fork) parts.push('🔀 Fork');
+      if (fields.dates) {
+        parts.push(`Created: ${shortDate(r.created_at)}, Updated: ${timeAgo(r.pushed_at)}`);
+      }
+      
+      text += parts.join(' | ') + '\n';
+    });
+    
+    this.shareContent = text;
+    document.getElementById('sharePreview').textContent = text;
+    document.getElementById('shareCopyBtn').style.display = 'inline-block';
+  },
+  
+  async copyShareContent() {
+    if (!this.shareContent) {
+      this.showToast('⚠️ Please generate preview first', 2000);
+      return;
+    }
+    
+    try {
+      await navigator.clipboard.writeText(this.shareContent);
+      this.showToast('✅ Copied to clipboard!', 2000);
+      setTimeout(() => this.closeShareModal(), 1500);
+    } catch (e) {
+      const fallback = document.createElement('textarea');
+      fallback.value = this.shareContent;
+      document.body.appendChild(fallback);
+      fallback.select();
+      try {
+        document.execCommand('copy');
+        this.showToast('✅ Copied to clipboard!', 2000);
+        setTimeout(() => this.closeShareModal(), 1500);
+      } catch (e2) {
+        this.showToast('❌ Copy failed. Please select and copy manually.', 3000);
+      }
+      document.body.removeChild(fallback);
     }
   }
 };
