@@ -792,12 +792,19 @@ const app = {
     this.render();
 
     Storage.remove(`cache_${active}`);
+    // If README search is about to run, defer list-fetch errors so both sets
+    // can be shown together in a single alert instead of two popups.
+    const willReadmeSearch = this.ts.readmeSearch && this.ts.query;
     try {
       const { repos, errors, totalQueries } = await this.fetchCategory(active);
       this.data[active] = repos;
       Storage.setJSON(`cache_${active}`, { repos, ts: Date.now(), withZeroStarForks: this.includeZeroStarForks });
       if (errors && errors.length > 0) {
-        this.showApiAlert(errors, totalQueries);
+        if (willReadmeSearch) {
+          this._pendingApiErrors = { errors, totalQueries };
+        } else {
+          this.showApiAlert(errors, totalQueries);
+        }
       }
     } catch (e) {
       console.error('Fetch error:', e);
@@ -862,6 +869,13 @@ const app = {
       this.showSearchOverlay('Searching READMEs...');
       await this.fetchReadmesForSearch();
       this.hideSearchOverlay();
+    }
+    // Fallback: surface any deferred list-fetch errors that the README path
+    // did not consume (e.g. when all READMEs were already cached).
+    if (this._pendingApiErrors) {
+      const { errors, totalQueries } = this._pendingApiErrors;
+      this._pendingApiErrors = null;
+      this.showApiAlert(errors, totalQueries);
     }
     this.updateFilterBanner();
     this.syncURL();
@@ -962,8 +976,9 @@ const app = {
     this.render();
     const BATCH = 6;
     let done = 0;
-    let errorCount = 0;
-    let toastShown = false;
+    // Collect non-404 errors so we can surface a single, clear alert at the
+    // end instead of silently producing a partial README search result set.
+    const errors = [];
     const total = pending.length;
     this.showSearchOverlay(`Searching READMEs... (0/${total})`);
     for (let i = 0; i < pending.length; i += BATCH) {
@@ -978,20 +993,27 @@ const app = {
           this.readmeCache[key] = '';
           const is404 = e.message && e.message.includes('404');
           if (!is404) {
-            errorCount++;
-            if (!toastShown) {
-              toastShown = true;
-              const hasToken = !!(Storage.get('github_pat') || '').trim();
-              const hint = hasToken ? '' : ' Add a token in ⚙️ Settings to increase the limit.';
-              this.showToast(`<span class="toast-icon">⚠️</span>Some README fetches failed (rate limit likely).${hint}`, 6000);
-            }
+            errors.push({ query: `readme ${key}`, error: e });
           }
         }
         this.readmeLoading[key] = false;
         done++;
+        const errorCount = errors.length;
         document.getElementById('searchOverlayText').textContent = `Searching READMEs... (${done}/${total}${errorCount ? ', ' + errorCount + ' failed' : ''})`;
       }));
       this.render();
+    }
+    // Merge any list-fetch errors that refreshData deferred so the user sees
+    // a single combined alert instead of two back-to-back popups.
+    let combinedErrors = errors;
+    let combinedTotal = total;
+    if (this._pendingApiErrors) {
+      combinedErrors = [...this._pendingApiErrors.errors, ...errors];
+      combinedTotal = this._pendingApiErrors.totalQueries + total;
+      this._pendingApiErrors = null;
+    }
+    if (combinedErrors.length > 0) {
+      this.showApiAlert(combinedErrors, combinedTotal);
     }
   },
 
