@@ -353,6 +353,20 @@ input:focus,select:focus{border-color:var(--accent)}
   </div>
 </div>
 
+<!-- API Alert Modal -->
+<div class="modal-overlay" id="apiAlertModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h2 id="apiAlertTitle">⚠️ Rate limit reached</h2>
+      <button class="btn-icon" onclick="app.closeApiAlert()">✕</button>
+    </div>
+    <div class="modal-body" id="apiAlertBody"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="app.closeApiAlert()">OK</button>
+    </div>
+  </div>
+</div>
+
 <!-- README Modal -->
 <div class="modal-overlay" id="readmeModal">
   <div class="modal" style="max-width:800px">
@@ -744,10 +758,16 @@ const app = {
     const allBaseQueries = [...queries.topics, ...queries.names];
     const seen = new Set();
     const results = [];
+    // Collect per-query failures so the caller can surface them to the user.
+    // Without a token, GitHub's 10 req/min search cap is easily hit and some
+    // sub-queries fail silently otherwise, producing a partial repo list.
+    const errors = [];
+    let totalQueries = 0;
 
     for (const baseQ of allBaseQueries) {
       const splitQueries = this.expandQueryForForkStarSplit(baseQ);
       for (const q of splitQueries) {
+        totalQueries++;
         try {
           const repos = await GitHub.exhaustiveSearch(q);
           for (const repo of repos) {
@@ -759,10 +779,11 @@ const app = {
           }
         } catch (e) {
           console.error(`Query failed [${q}]:`, e);
+          errors.push({ query: q, error: e });
         }
       }
     }
-    return results;
+    return { repos: results, errors, totalQueries };
   },
 
   async refreshData() {
@@ -772,9 +793,12 @@ const app = {
 
     Storage.remove(`cache_${active}`);
     try {
-      const repos = await this.fetchCategory(active);
+      const { repos, errors, totalQueries } = await this.fetchCategory(active);
       this.data[active] = repos;
       Storage.setJSON(`cache_${active}`, { repos, ts: Date.now(), withZeroStarForks: this.includeZeroStarForks });
+      if (errors && errors.length > 0) {
+        this.showApiAlert(errors, totalQueries);
+      }
     } catch (e) {
       console.error('Fetch error:', e);
       const msg = (e && e.message) ? e.message : String(e);
@@ -1214,6 +1238,56 @@ const app = {
     document.getElementById('settingsModal').classList.remove('open');
   },
 
+  // ─── API Alert (rate-limit / failed queries) ───
+  _apiAlertTimer: null,
+  showApiAlert(errors, totalQueries) {
+    if (!errors || errors.length === 0) return;
+    const modal = document.getElementById('apiAlertModal');
+    const titleEl = document.getElementById('apiAlertTitle');
+    const bodyEl = document.getElementById('apiAlertBody');
+    if (!modal || !titleEl || !bodyEl) return;
+
+    const rateLimitErrors = errors.filter(e => {
+      const msg = (e && e.error && e.error.message) || '';
+      return /rate limit|\b429\b|\b403\b/i.test(msg);
+    });
+    const hasToken = !!(Storage.get('github_pat') || '').trim();
+    // Fall back to `errors.length` if the caller did not provide a total so the
+    // message still makes sense (e.g. "2 of 2" when nothing else was attempted).
+    const total = (typeof totalQueries === 'number' && totalQueries >= errors.length)
+      ? totalQueries : errors.length;
+
+    let html = '';
+    if (rateLimitErrors.length > 0) {
+      titleEl.textContent = '⚠️ Rate limit reached';
+      html += `<p>${rateLimitErrors.length} of ${total} GitHub API request(s) failed because the search rate limit was hit. The repository list below may be <strong>incomplete</strong>.</p>`;
+      if (!hasToken) {
+        html += `<p style="margin-top:.75rem">We hit the query limit. To fix this, get a <strong>free GitHub Personal Access Token</strong> and enter it in ⚙️ Settings. This raises the rate limit from 10 to 30 requests per minute.</p>`;
+        html += `<p style="margin-top:.5rem;font-size:.85rem;color:var(--text3)"><a href="https://github.com/settings/tokens" target="_blank" rel="noopener">Create a token on GitHub</a> — no scopes needed, public repo access is sufficient.</p>`;
+      } else {
+        html += `<p style="margin-top:.75rem">Your token's rate limit is exhausted. Please wait a minute and click 🔄 to retry, or use a different token in ⚙️ Settings.</p>`;
+      }
+    } else {
+      titleEl.textContent = '⚠️ Some requests failed';
+      const firstMsg = (errors[0] && errors[0].error && errors[0].error.message) || String(errors[0].error || 'Unknown error');
+      html += `<p>${errors.length} of ${total} GitHub API request(s) failed, so the repository list may be <strong>incomplete</strong>.</p>`;
+      html += `<p style="margin-top:.5rem;font-size:.85rem;color:var(--text3)">${esc(firstMsg)}</p>`;
+    }
+    bodyEl.innerHTML = html;
+    modal.classList.add('open');
+
+    // Auto-dismiss after a while so the user doesn't have to click if they
+    // walk away; they can also click OK or ✕ to close immediately.
+    if (this._apiAlertTimer) clearTimeout(this._apiAlertTimer);
+    this._apiAlertTimer = setTimeout(() => this.closeApiAlert(), 20000);
+  },
+
+  closeApiAlert() {
+    if (this._apiAlertTimer) { clearTimeout(this._apiAlertTimer); this._apiAlertTimer = null; }
+    const modal = document.getElementById('apiAlertModal');
+    if (modal) modal.classList.remove('open');
+  },
+
   saveSettings() {
     const token = document.getElementById('patInput').value.trim();
     if (token) {
@@ -1351,12 +1425,26 @@ const app = {
 
 // Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+  el.addEventListener('click', e => {
+    if (e.target !== el) return;
+    if (el.id === 'apiAlertModal' && typeof app !== 'undefined' && app.closeApiAlert) {
+      app.closeApiAlert();
+    } else {
+      el.classList.remove('open');
+    }
+  });
 });
 
 // Close modals on Escape
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-overlay.open').forEach(m => {
+    if (m.id === 'apiAlertModal' && typeof app !== 'undefined' && app.closeApiAlert) {
+      app.closeApiAlert();
+    } else {
+      m.classList.remove('open');
+    }
+  });
 });
 
 // ─── Scroll hide/show header + controls ───
