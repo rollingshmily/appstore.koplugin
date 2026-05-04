@@ -24,6 +24,7 @@ local MultiInputDialog = require("ui/widget/multiinputdialog")
 local CheckButton = require("ui/widget/checkbutton")
 local ButtonDialog = require("ui/widget/buttondialog")
 local Font = require("ui/font")
+local Dispatcher = require("dispatcher")
 local InputDialog = require("ui/widget/inputdialog")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local FrameContainer = require("ui/widget/container/framecontainer")
@@ -6142,6 +6143,7 @@ end
 
 function AppStore:init()
     self.cache_dir = ensureCacheDir()
+    self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
 end
 
@@ -6154,6 +6156,22 @@ function AppStore:addToMainMenu(menu_items)
         end,
     }
 end
+
+function AppStore:onDispatcherRegisterActions()
+    Dispatcher:registerAction("AppStore_open", {
+        category = "none",
+        event = "OpenAppStoreMenu",
+        title = _("Open AppStore"),
+        general = true,
+    })
+end
+
+function AppStore:onOpenAppStoreMenu()
+    UIManager:nextTick(function()
+        self:showBrowser()
+    end)
+end
+
 
 return AppStore
 
