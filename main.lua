@@ -790,6 +790,79 @@ local function firstNonEmpty(...)
     end
 end
 
+local function isPreReleaseTag(tag_name)
+    if not tag_name then
+        return false
+    end
+    
+    local lower = tag_name:lower()
+    local prerelease_keywords = {
+        "alpha",
+        "beta",
+        "rc",
+        "dev",
+        "preview",
+        "pre",
+        "test",
+    }
+    
+    for _, keyword in ipairs(prerelease_keywords) do
+        if lower:find(keyword, 1, true) then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function isDateBasedVersion(version_str)
+    if not version_str then
+        return false
+    end
+    
+    local year, month, day = version_str:match("^(%d%d%d%d)%.(%d+)%.(%d+)$")
+    if year then
+        local y = tonumber(year)
+        local m = tonumber(month)
+        local d = tonumber(day)
+        
+        if y >= 2000 and y <= 2100 and m >= 1 and m <= 12 and d >= 1 and d <= 31 then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function parseVersionFromTag(tag_name)
+    if not tag_name then
+        return nil
+    end
+    
+    local cleaned = tag_name:gsub("^[vV]", "")
+    cleaned = cleaned:gsub("^release%-?", "")
+    cleaned = cleaned:gsub("^version%-?", "")
+    cleaned = cleaned:gsub("^plugin%-?", "")
+    
+    local patterns = {
+        "^(%d+%.%d+%.%d+)",
+        "^(%d+%.%d+)",
+        "^(%d+)",
+    }
+    
+    for _, pattern in ipairs(patterns) do
+        local version = cleaned:match(pattern)
+        if version then
+            if isDateBasedVersion(version) then
+                return nil
+            end
+            return version
+        end
+    end
+    
+    return nil
+end
+
 local function isVersionNewer(v1_str, v2_str)
     if not v1_str or not v2_str then
         return false
@@ -1047,23 +1120,42 @@ function AppStore:collectUpdateSummary()
 
         local remote = remote_info[plugin.dirname]
         local local_version = plugin.version
-        local remote_version = remote and remote.remote_version
         local local_latest_ts = plugin.latest_mtime
         if not local_latest_ts or local_latest_ts == 0 then
             local_latest_ts = getLatestModificationTimestamp(plugin.path)
             plugin.latest_mtime = local_latest_ts
         end
-        local remote_repo_ts = remote and remote.remote_repo_ts or 0
-        local remote_newer_by_date = false
-        if tracked and remote_repo_ts and remote_repo_ts > (local_latest_ts or 0) then
-            remote_newer_by_date = true
-        end
+        
         local has_update = false
-        if remote_newer_by_date then
-            has_update = true
-        elseif tracked and remote_version and local_version then
-            has_update = isVersionNewer(remote_version, local_version)
+        
+        if tracked and remote then
+            local release_tag = remote.release_tag_name
+            local release_ts = remote.release_published_at or 0
+            
+            if release_tag then
+                local release_version = parseVersionFromTag(release_tag)
+                
+                if release_version then
+                    if local_version then
+                        has_update = isVersionNewer(release_version, local_version)
+                    else
+                        has_update = release_ts > local_latest_ts
+                    end
+                else
+                    has_update = release_ts > local_latest_ts
+                end
+            else
+                local remote_version = remote.remote_version
+                local remote_repo_ts = remote.remote_repo_ts or 0
+                
+                if remote_repo_ts > local_latest_ts then
+                    has_update = true
+                elseif remote_version and local_version then
+                    has_update = isVersionNewer(remote_version, local_version)
+                end
+            end
         end
+        
         if has_update then
             summary.updates = summary.updates + 1
         end
@@ -1073,9 +1165,6 @@ function AppStore:collectUpdateSummary()
             record = record,
             remote = remote,
             has_update = has_update,
-            remote_newer_by_date = remote_newer_by_date,
-            remote_repo_ts = remote_repo_ts,
-            local_latest_ts = local_latest_ts,
         }
     end
 
@@ -1112,14 +1201,64 @@ function AppStore:buildUpdateItems(summary)
                 string.format("• %s%s (%s)", disabled_label, plugin.name or plugin.dirname, plugin.dirname),
             }
 
-            local local_line = string.format(_("Local: %s"), plugin.version or _("unknown"))
-            if remote and remote.remote_version then
-                local_line = string.format("%s  %s", local_line, string.format(_("Remote: %s"), remote.remote_version))
+            local local_version_str = plugin.version or _("unknown")
+            local remote_version_str = nil
+            local update_reason = nil
+            
+            if remote then
+                if remote.release_tag_name then
+                    local release_version = parseVersionFromTag(remote.release_tag_name)
+                    if release_version then
+                        remote_version_str = release_version
+                    else
+                        remote_version_str = remote.release_tag_name
+                    end
+                    
+                    if item.has_update then
+                        if release_version and plugin.version then
+                            if isVersionNewer(release_version, plugin.version) then
+                                update_reason = nil
+                            else
+                                update_reason = _("release is newer by date")
+                            end
+                        else
+                            update_reason = _("release is newer by date")
+                        end
+                    end
+                else
+                    if remote.remote_version then
+                        remote_version_str = remote.remote_version
+                    end
+                    
+                    if item.has_update then
+                        local local_latest_ts = plugin.latest_mtime or 0
+                        local remote_repo_ts = remote.remote_repo_ts or 0
+                        
+                        if remote_repo_ts > local_latest_ts then
+                            update_reason = _("remote is newer by date")
+                        elseif plugin.version and remote.remote_version then
+                            if isVersionNewer(remote.remote_version, plugin.version) then
+                                update_reason = nil
+                            else
+                                update_reason = _("remote is newer by date")
+                            end
+                        else
+                            update_reason = _("remote is newer by date")
+                        end
+                    end
+                end
             end
-            if item.remote_newer_by_date then
-                local_line = string.format("%s  %s", local_line, _("Remote newer by files"))
+            
+            local version_line
+            if remote_version_str then
+                version_line = string.format(_("Local: %s → Remote: %s"), local_version_str, remote_version_str)
+            else
+                version_line = string.format(_("Local: %s"), local_version_str)
             end
-            table.insert(lines, local_line)
+            if update_reason then
+                version_line = version_line .. " (" .. update_reason .. ")"
+            end
+            table.insert(lines, version_line)
 
             if record and record.owner and record.repo then
                 table.insert(lines, string.format(_("Repo: %s/%s"), record.owner, record.repo))
@@ -1532,15 +1671,63 @@ function AppStore:checkAllUpdates()
                 local repo_name = record.repo
                 local remote_version
                 local remote_repo_ts = 0
+                local release_tag_name
+                local release_published_at
                 local last_err
 
                 if not owner or not repo_name then
                     last_err = "Missing repository info."
                 else
+                    local latest_release, release_err = GitHub.fetchLatestRelease(owner, repo_name)
+                    
+                    if latest_release and latest_release.tag_name then
+                        if not latest_release.prerelease and not latest_release.draft then
+                            local tag_lower = latest_release.tag_name:lower()
+                            local is_prerelease_tag = tag_lower:find("alpha", 1, true) or 
+                                                      tag_lower:find("beta", 1, true) or 
+                                                      tag_lower:find("rc", 1, true) or 
+                                                      tag_lower:find("dev", 1, true) or 
+                                                      tag_lower:find("preview", 1, true) or 
+                                                      tag_lower:find("pre", 1, true) or 
+                                                      tag_lower:find("test", 1, true)
+                            
+                            if not is_prerelease_tag then
+                                release_tag_name = latest_release.tag_name
+                                release_published_at = parseGitHubTimestampWorker(latest_release.published_at)
+                            end
+                        end
+                    end
+                    
+                    if not release_tag_name then
+                        local releases, fetch_err = GitHub.fetchReleases(owner, repo_name, {
+                            per_page = 30,
+                            max_pages = 1,
+                        })
+                        
+                        if releases and #releases > 0 then
+                            for _, release in ipairs(releases) do
+                                if not release.draft and not release.prerelease then
+                                    local tag_lower = release.tag_name:lower()
+                                    local is_prerelease_tag = tag_lower:find("alpha", 1, true) or 
+                                                              tag_lower:find("beta", 1, true) or 
+                                                              tag_lower:find("rc", 1, true) or 
+                                                              tag_lower:find("dev", 1, true) or 
+                                                              tag_lower:find("preview", 1, true) or 
+                                                              tag_lower:find("pre", 1, true) or 
+                                                              tag_lower:find("test", 1, true)
+                                    
+                                    if not is_prerelease_tag then
+                                        release_tag_name = release.tag_name
+                                        release_published_at = parseGitHubTimestampWorker(release.published_at)
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
                     local metadata, metadata_err = GitHub.fetchRepoMetadata(owner, repo_name)
                     if metadata and type(metadata) == "table" then
-                        -- Prefer pushed_at (last pushed commit, including merged PRs),
-                        -- fall back to created_at if missing
                         local ts = metadata.pushed_at or metadata.created_at
                         remote_repo_ts = parseGitHubTimestampWorker(ts)
                     else
@@ -1578,6 +1765,8 @@ function AppStore:checkAllUpdates()
                     result[dirname] = {
                         remote_version = remote_version,
                         remote_repo_ts = remote_repo_ts,
+                        release_tag_name = release_tag_name,
+                        release_published_at = release_published_at,
                         error = last_err,
                         last_checked = os.time(),
                     }
@@ -1666,30 +1855,84 @@ function AppStore:_checkAllUpdatesInternal(records)
     UIManager:setDirty(nil, "full")
 end
 
+local function findLatestStableRelease(owner, repo)
+    local GitHub = require("appstore_net_github")
+    
+    local latest, err = GitHub.fetchLatestRelease(owner, repo)
+    
+    if latest and latest.tag_name then
+        if not latest.prerelease and not latest.draft then
+            if not isPreReleaseTag(latest.tag_name) then
+                return latest, nil
+            end
+        end
+    end
+    
+    local releases, fetch_err = GitHub.fetchReleases(owner, repo, {
+        per_page = 30,
+        max_pages = 1,
+    })
+    
+    if not releases or #releases == 0 then
+        return nil, fetch_err or err or "No releases found"
+    end
+    
+    for _, release in ipairs(releases) do
+        if not release.draft and not release.prerelease then
+            if not isPreReleaseTag(release.tag_name) then
+                return release, nil
+            end
+        end
+    end
+    
+    return nil, "No stable release found"
+end
+
 function AppStore:fetchRemoteVersionForRecord(record)
     if not record or not record.owner or not record.repo then
         return nil, 0, _("Not matched with a repository.")
     end
 
+    local owner = record.owner
+    local repo_name = record.repo
+    local last_err
+    
+    local latest_release, release_err = findLatestStableRelease(owner, repo_name)
+    
+    if latest_release and latest_release.tag_name then
+        local release_version = parseVersionFromTag(latest_release.tag_name)
+        local release_ts = parseGitHubTimestamp(latest_release.published_at)
+        
+        self:ensureUpdatesState()
+        local dirname = record.dirname
+        if dirname then
+            local cached = self.updates_state.remote_info[dirname] or {}
+            cached.release_tag_name = latest_release.tag_name
+            cached.release_published_at = release_ts
+            self.updates_state.remote_info[dirname] = cached
+        end
+        
+        return release_version, release_ts, nil
+    end
+    
     local meta_candidates = buildMetaPathCandidates(record)
     if #meta_candidates == 0 then
         return nil, 0, _("Missing meta path in record.")
     end
 
     local branch_candidates = buildBranchCandidates(record)
-    local last_err
     local remote_repo_ts = 0
-    local metadata, metadata_err = GitHub.fetchRepoMetadata(record.owner, record.repo)
+    local metadata, metadata_err = GitHub.fetchRepoMetadata(owner, repo_name)
     if metadata and type(metadata) == "table" then
-        -- Prefer pushed_at (last pushed commit), then created_at
         local ts = metadata.pushed_at or metadata.created_at
         remote_repo_ts = parseGitHubTimestamp(ts)
     else
         last_err = metadata_err or last_err
     end
+    
     for meta_idx, meta_path in ipairs(meta_candidates) do
         for branch_idx, branch in ipairs(branch_candidates) do
-            local body, err = fetchGitHubRaw(record.owner, record.repo, branch, meta_path)
+            local body, err = fetchGitHubRaw(owner, repo_name, branch, meta_path)
             if body then
                 local version = extractMetaField(body, "version")
                 if version then
@@ -1710,8 +1953,6 @@ function AppStore:fetchRemoteVersionForRecord(record)
         end
     end
 
-    -- If we only saw 404/not-found style issues, treat this as "no remote version info"
-    -- instead of a hard error, so single-plugin checks can report gracefully.
     if last_err then
         local msg = tostring(last_err)
         if msg:find("404", 1, true) or msg == _("Remote version not found.") then
@@ -2380,12 +2621,14 @@ function AppStore:_checkSinglePluginInternal(record)
     UIManager:show(progress)
     local remote_version, remote_repo_ts, err = self:fetchRemoteVersionForRecord(record)
     UIManager:close(progress)
-    self.updates_state.remote_info[record.dirname] = {
-        remote_version = remote_version,
-        remote_repo_ts = remote_repo_ts,
-        error = err,
-        last_checked = os.time(),
-    }
+    
+    local cached = self.updates_state.remote_info[record.dirname] or {}
+    cached.remote_version = remote_version
+    cached.remote_repo_ts = remote_repo_ts
+    cached.error = err
+    cached.last_checked = os.time()
+    self.updates_state.remote_info[record.dirname] = cached
+    
     self:updateUpdatesDialog()
 
     local message
@@ -6308,6 +6551,19 @@ function AppStore:handlePostInstall(info, repo)
                 text = string.format(_("Updated %s to version %s."), plugin.name or plugin.dirname, info.plugin_version or _("unknown")),
                 timeout = 5,
             })
+            -- Update the remote_info cache to reflect the newly installed version
+            -- so the plugin won't appear as outdated immediately after update
+            if info.plugin_dirname then
+                self:ensureUpdatesState()
+                local cached = self.updates_state.remote_info[info.plugin_dirname]
+                if cached then
+                    cached.remote_version = info.plugin_version
+                    -- Keep the original remote_repo_ts from the last check
+                    -- (don't set to os.time() as that would be incorrect)
+                    cached.last_checked = os.time()
+                    cached.error = nil
+                end
+            end
         end
     end
 end
