@@ -86,6 +86,18 @@ local AppStore = WidgetContainer:extend{
     readme_filter = nil,
 }
 
+local function showRestartConfirmation(message)
+    UIManager:show(ConfirmBox:new{
+        text = message .. "\n\n" .. _("This will take effect on next restart."),
+        ok_text = _("Restart now"),
+        ok_callback = function()
+            UIManager:restartKOReader()
+        end,
+        cancel_text = _("Restart later"),
+        background = Blitbuffer.COLOR_WHITE,
+    })
+end
+
 local AppStoreListItem = InputContainer:extend{
     entry = nil,
     width = nil,
@@ -2236,10 +2248,7 @@ function AppStore:promptUpdateAction(plugin, record)
             callback = function()
                 UIManager:close(info_box)
                 self:enablePlugin(plugin.dirname)
-                UIManager:show(InfoMessage:new{
-                    text = string.format(_("Plugin '%s' enabled. Restart to apply changes."), plugin.name or plugin.dirname),
-                    timeout = 4,
-                })
+                showRestartConfirmation(string.format(_("Plugin '%s' enabled."), plugin.name or plugin.dirname))
                 if self.updates_menu then
                     self:updateUpdatesDialog()
                 end
@@ -2252,10 +2261,7 @@ function AppStore:promptUpdateAction(plugin, record)
             callback = function()
                 UIManager:close(info_box)
                 self:disablePlugin(plugin.dirname)
-                UIManager:show(InfoMessage:new{
-                    text = string.format(_("Plugin '%s' disabled. Restart to apply changes."), plugin.name or plugin.dirname),
-                    timeout = 4,
-                })
+                showRestartConfirmation(string.format(_("Plugin '%s' disabled."), plugin.name or plugin.dirname))
                 if self.updates_menu then
                     self:updateUpdatesDialog()
                 end
@@ -2380,10 +2386,7 @@ function AppStore:promptPatchUpdateAction(patch_item)
                 UIManager:close(info_box)
                 local ok = self:enablePatch(patch.filename)
                 if ok then
-                    UIManager:show(InfoMessage:new{
-                        text = string.format(_("Patch '%s' enabled. Restart to apply changes."), patch.filename),
-                        timeout = 4,
-                    })
+                    showRestartConfirmation(string.format(_("Patch '%s' enabled."), patch.filename))
                     if self.patch_updates_menu then
                         self:updatePatchUpdatesDialog()
                     end
@@ -2403,10 +2406,7 @@ function AppStore:promptPatchUpdateAction(patch_item)
                 UIManager:close(info_box)
                 local ok = self:disablePatch(patch.filename)
                 if ok then
-                    UIManager:show(InfoMessage:new{
-                        text = string.format(_("Patch '%s' disabled. Restart to apply changes."), patch.filename),
-                        timeout = 4,
-                    })
+                    showRestartConfirmation(string.format(_("Patch '%s' disabled."), patch.filename))
                     if self.patch_updates_menu then
                         self:updatePatchUpdatesDialog()
                     end
@@ -2489,10 +2489,7 @@ function AppStore:deletePlugin(dirname, record)
                 if record then
                     InstallStore.remove(dirname)
                 end
-                UIManager:show(InfoMessage:new{
-                    text = string.format(_("Plugin '%s' deleted. Restart to apply changes."), display_name),
-                    timeout = 5,
-                })
+                showRestartConfirmation(string.format(_("Plugin '%s' deleted."), display_name))
                 if self.updates_menu then
                     self:updateUpdatesDialog()
                 end
@@ -2569,10 +2566,7 @@ function AppStore:deletePatch(filename, record)
                 if record then
                     InstallStore.removePatch(filename)
                 end
-                UIManager:show(InfoMessage:new{
-                    text = string.format(_("Patch '%s' deleted. Restart to apply changes."), display_name),
-                    timeout = 5,
-                })
+                showRestartConfirmation(string.format(_("Patch '%s' deleted."), display_name))
                 if self.patch_updates_menu then
                     self:updatePatchUpdatesDialog()
                 end
@@ -3337,22 +3331,19 @@ function AppStore:_installPatchFromRepoInternal(repo, patch)
         return
     end
     local stored_record = self:rememberPatchInstall(patch.filename, repo, patch)
-    UIManager:show(InfoMessage:new{
-        text = string.format(_("Installed patch \"%s\"."), patch.filename),
-        timeout = 5,
-    })
-    if stored_record then
-        self:updateSinglePatchStatus(patch.filename, stored_record)
-    end
     if self.pending_patch_install then
         local context = self.pending_patch_install
         self.pending_patch_install = nil
         if context.mode == "update" and context.patch then
-            UIManager:show(InfoMessage:new{
-                text = string.format(_("Updated patch %s."), context.patch.filename or _("patch")),
-                timeout = 4,
-            })
+            showRestartConfirmation(string.format(_("Updated patch %s."), context.patch.filename or _("patch")))
+        else
+            showRestartConfirmation(string.format(_("Installed patch \"%s\"."), patch.filename))
         end
+    else
+        showRestartConfirmation(string.format(_("Installed patch \"%s\"."), patch.filename))
+    end
+    if stored_record then
+        self:updateSinglePatchStatus(patch.filename, stored_record)
     end
 end
         self.ges_events = {
@@ -3856,21 +3847,42 @@ function AppStore:promptPluginInstallOptions(repo, release_override)
         })
 
         local assets = release and release.assets
+        local custom_assets = {}
+        
         if type(assets) == "table" then
             for _, asset in ipairs(assets) do
                 local name = asset and asset.name
                 local url = asset and asset.browser_download_url
-                local is_source = name and (name:match("^Source code") ~= nil)
-                if name and url and not is_source then
-                    table.insert(buttons, {
-                        text = name,
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:installPluginFromReleaseAsset(repo, release, asset)
-                        end,
-                    })
+                if name and url then
+                    table.insert(custom_assets, asset)
                 end
             end
+        end
+        
+        if #custom_assets > 0 then
+            for _, asset in ipairs(custom_assets) do
+                table.insert(buttons, {
+                    text = asset.name,
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:installPluginFromReleaseAsset(repo, release, asset)
+                    end,
+                })
+            end
+        elseif release and release.zipball_url then
+            local tag_name = release.tag_name or "latest"
+            local source_code_name = string.format("Source code (%s.zip)", tag_name)
+            table.insert(buttons, {
+                text = source_code_name,
+                callback = function()
+                    UIManager:close(dialog)
+                    local source_asset = {
+                        name = source_code_name,
+                        browser_download_url = release.zipball_url,
+                    }
+                    self:installPluginFromReleaseAsset(repo, release, source_asset)
+                end,
+            })
         end
 
         local show_notes = release ~= nil
@@ -4124,13 +4136,24 @@ function AppStore:installPluginFromReleaseAsset(repo, release, asset)
             return
         end
 
+        UIManager:close(install_progress)
+        
         local msg
-        if info.plugin_version and info.plugin_version ~= "" then
-            msg = string.format(_("Installed plugin \"%s\" (version %s). Restart KOReader to load it."), info.plugin_name, info.plugin_version)
+        if self.pending_install_context and self.pending_install_context.mode == "update" then
+            if info.plugin_version and info.plugin_version ~= "" then
+                msg = string.format(_("Updated plugin \"%s\" to version %s."), info.plugin_name, info.plugin_version)
+            else
+                msg = string.format(_("Updated plugin \"%s\"."), info.plugin_name)
+            end
         else
-            msg = string.format(_("Installed plugin \"%s\". Restart KOReader to load it."), info.plugin_name)
+            if info.plugin_version and info.plugin_version ~= "" then
+                msg = string.format(_("Installed plugin \"%s\" (version %s)."), info.plugin_name, info.plugin_version)
+            else
+                msg = string.format(_("Installed plugin \"%s\"."), info.plugin_name)
+            end
         end
-        UIManager:show(InfoMessage:new{ text = msg, timeout = 8 })
+        
+        showRestartConfirmation(msg)
 
         self:handlePostInstall(info, repo)
         if self.updates_menu then
@@ -4163,6 +4186,14 @@ extractReleaseNameFallback = function(repo, release, asset, meta_source)
     local asset_plugin_dir = asset_name and asset_name:match("([%w_%-%.]+%.koplugin)%.zip$")
     if asset_plugin_dir then
         return asset_plugin_dir
+    end
+    
+    local is_source_code = asset_name and asset_name:match("^Source code") ~= nil
+    if is_source_code and repo_name then
+        local repo_is_plugin_dir = repo_name:match("^[%w_%-%.]+%.koplugin$") ~= nil
+        if repo_is_plugin_dir then
+            return repo_name
+        end
     end
 
     local repo_is_plugin_dir = repo_name and repo_name:match("^[%w_%-%.]+%.koplugin$") ~= nil
@@ -6159,16 +6190,25 @@ local function detectPluginFromArchive(reader, repo)
     end
 
     if not plugin_dirname then
-        local repo_name = repo and repo.name
-        local repo_is_plugin_dir = repo_name and repo_name:match("^[%w_%-%.]+%.koplugin$") ~= nil
-        if repo_is_plugin_dir then
-            plugin_dirname = repo_name
-        elseif plugin_name and plugin_name ~= "" then
-            plugin_dirname = sanitizePluginDirname(plugin_name)
-        elseif repo_name then
-            plugin_dirname = sanitizePluginDirname(repo_name)
-        else
-            plugin_dirname = sanitizePluginDirname("appstore")
+        if plugin_root and plugin_root ~= "" then
+            local root_basename = plugin_root:match("([^/]+)$")
+            if root_basename and root_basename:match("%.koplugin%-") then
+                plugin_dirname = root_basename:match("(.+%.koplugin)%-")
+            end
+        end
+        
+        if not plugin_dirname then
+            local repo_name = repo and repo.name
+            local repo_is_plugin_dir = repo_name and repo_name:match("^[%w_%-%.]+%.koplugin$") ~= nil
+            if repo_is_plugin_dir then
+                plugin_dirname = repo_name
+            elseif plugin_name and plugin_name ~= "" then
+                plugin_dirname = sanitizePluginDirname(plugin_name)
+            elseif repo_name then
+                plugin_dirname = sanitizePluginDirname(repo_name)
+            else
+                plugin_dirname = sanitizePluginDirname("appstore")
+            end
         end
     elseif (not plugin_name or plugin_name == "") then
         plugin_name = plugin_dirname:gsub("%.koplugin$", "")
@@ -6510,23 +6550,22 @@ function AppStore:_installPluginFromRepoInternal(repo)
     end
 
     local msg
-    if info.plugin_version and info.plugin_version ~= "" then
-        msg = string.format(
-            _("Installed plugin \"%s\" (version %s). Restart KOReader to load it."),
-            info.plugin_name,
-            info.plugin_version
-        )
+    if self.pending_install_context and self.pending_install_context.mode == "update" then
+        if info.plugin_version and info.plugin_version ~= "" then
+            msg = string.format(_("Updated plugin \"%s\" to version %s."), info.plugin_name, info.plugin_version)
+        else
+            msg = string.format(_("Updated plugin \"%s\"."), info.plugin_name)
+        end
     else
-        msg = string.format(
-            _("Installed plugin \"%s\". Restart KOReader to load it."),
-            info.plugin_name
-        )
+        if info.plugin_version and info.plugin_version ~= "" then
+            msg = string.format(_("Installed plugin \"%s\" (version %s)."), info.plugin_name, info.plugin_version)
+        else
+            msg = string.format(_("Installed plugin \"%s\"."), info.plugin_name)
+        end
     end
 
-    UIManager:show(InfoMessage:new{
-        text = msg,
-        timeout = 8,
-    })
+    UIManager:close(install_progress)
+    showRestartConfirmation(msg)
 
     self:handlePostInstall(info, repo)
     if self.updates_menu then
@@ -6547,10 +6586,6 @@ function AppStore:handlePostInstall(info, repo)
         local plugin = context.plugin
         local record = plugin and getRecordedInstall(plugin.dirname)
         if plugin and record then
-            UIManager:show(InfoMessage:new{
-                text = string.format(_("Updated %s to version %s."), plugin.name or plugin.dirname, info.plugin_version or _("unknown")),
-                timeout = 5,
-            })
             -- Update the remote_info cache to reflect the newly installed version
             -- so the plugin won't appear as outdated immediately after update
             if info.plugin_dirname then
