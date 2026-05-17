@@ -1998,8 +1998,9 @@ function AppStore:checkAllUpdates()
         end
 
         local info = InfoMessage:new{
-            text = _("Checking plugin updates… (tap to cancel)"),
+            text = _("Checking plugin updates…"),
             timeout = 0,
+            dismissable = false,
         }
         UIManager:show(info)
         UIManager:forceRePaint()
