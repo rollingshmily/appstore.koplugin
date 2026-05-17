@@ -625,8 +625,10 @@ function AppStore:buildPatchUpdateItems(summary)
     summary = summary or self:collectPatchUpdateSummary()
     local entries = {}
     local filter_updates = self.patch_updates_state.filter_only_outdated
+    local filter_linked = self.patch_updates_state.filter_only_linked
     for idx, patch_item in ipairs(summary.data or {}) do
-        if (not filter_updates) or patch_item.needs_update then
+        local is_linked = patch_item.record and patch_item.record.owner and patch_item.record.repo
+        if ((not filter_updates) or patch_item.needs_update) and ((not filter_linked) or is_linked) then
             local patch = patch_item.patch
             local record = patch_item.record
             local remote_entry = patch_item.remote_entry
@@ -1079,6 +1081,7 @@ function AppStore:ensureUpdatesState()
         self.updates_state = {}
     end
     self.updates_state.filter_only_outdated = self.updates_state.filter_only_outdated or false
+    self.updates_state.filter_only_linked = self.updates_state.filter_only_linked or false
     self.updates_state.remote_info = self.updates_state.remote_info or {}
 end
 
@@ -1087,6 +1090,7 @@ function AppStore:ensurePatchUpdatesState()
         self.patch_updates_state = {}
     end
     self.patch_updates_state.filter_only_outdated = self.patch_updates_state.filter_only_outdated or false
+    self.patch_updates_state.filter_only_linked = self.patch_updates_state.filter_only_linked or false
     self.patch_updates_state.remote_info = self.patch_updates_state.remote_info or {}
 end
 
@@ -1203,8 +1207,10 @@ function AppStore:buildUpdateItems(summary)
     summary = summary or self:collectUpdateSummary()
     local entries = {}
     local filter_updates = self.updates_state.filter_only_outdated
+    local filter_linked = self.updates_state.filter_only_linked
     for idx, item in ipairs(summary.data or {}) do
-        if (not filter_updates) or item.has_update then
+        local is_linked = item.record and item.record.owner and item.record.repo
+        if ((not filter_updates) or item.has_update) and ((not filter_linked) or is_linked) then
             local plugin = item.plugin
             local record = item.record
             local remote = item.remote
@@ -1338,12 +1344,20 @@ function AppStore:buildUpdateBrowserItems(summary)
     }
     items[#items].separator = true
 
-    local filter_label = self.updates_state.filter_only_outdated and _("Show all plugins") or _("Show only needs update")
+    local current_filter
+    if self.updates_state.filter_only_outdated then
+        current_filter = _("Needs update")
+    elseif self.updates_state.filter_only_linked then
+        current_filter = _("Linked only")
+    else
+        current_filter = _("All plugins")
+    end
+
     items[#items + 1] = {
-        text = filter_label,
+        text = _("Filter: ") .. current_filter,
         keep_menu_open = true,
         callback = function()
-            self:toggleUpdatesFilter()
+            self:showPluginFilterDialog()
         end,
     }
     items[#items].separator = true
@@ -1387,12 +1401,20 @@ function AppStore:buildPatchUpdateBrowserItems(summary)
     }
     items[#items].separator = true
 
-    local filter_label = self.patch_updates_state.filter_only_outdated and _("Show all patches") or _("Show only needs update")
+    local current_filter
+    if self.patch_updates_state.filter_only_outdated then
+        current_filter = _("Needs update")
+    elseif self.patch_updates_state.filter_only_linked then
+        current_filter = _("Linked only")
+    else
+        current_filter = _("All patches")
+    end
+
     items[#items + 1] = {
-        text = filter_label,
+        text = _("Filter: ") .. current_filter,
         keep_menu_open = true,
         callback = function()
-            self:togglePatchUpdatesFilter()
+            self:showPatchFilterDialog()
         end,
     }
     items[#items].separator = true
@@ -1610,6 +1632,82 @@ function AppStore:toggleUpdatesFilter()
     self:updateUpdatesDialog()
 end
 
+function AppStore:toggleLinkedFilter()
+    self:ensureUpdatesState()
+    self.updates_state.filter_only_linked = not self.updates_state.filter_only_linked
+    self:updateUpdatesDialog()
+end
+
+function AppStore:showPluginFilterDialog()
+    self:ensureUpdatesState()
+    local current_outdated = self.updates_state.filter_only_outdated
+    local current_linked = self.updates_state.filter_only_linked
+
+    local function makeCheckbox(enabled)
+        return enabled and "☑ " or "☐ "
+    end
+
+    local buttons = {
+        {
+            {
+                text = makeCheckbox(not current_outdated and not current_linked) .. _("All plugins"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.plugin_filter_dialog)
+                    self.updates_state.filter_only_outdated = false
+                    self.updates_state.filter_only_linked = false
+                    UIManager:nextTick(function()
+                        self:updateUpdatesDialog()
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = makeCheckbox(current_outdated) .. _("Needs update"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.plugin_filter_dialog)
+                    self.updates_state.filter_only_outdated = true
+                    self.updates_state.filter_only_linked = false
+                    UIManager:nextTick(function()
+                        self:updateUpdatesDialog()
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = makeCheckbox(current_linked) .. _("Linked only"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.plugin_filter_dialog)
+                    self.updates_state.filter_only_outdated = false
+                    self.updates_state.filter_only_linked = true
+                    UIManager:nextTick(function()
+                        self:updateUpdatesDialog()
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = _("Close"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.plugin_filter_dialog)
+                end,
+            },
+        },
+    }
+
+    self.plugin_filter_dialog = ButtonDialog:new{
+        title = _("Filter Installed Plugins"),
+        buttons = buttons,
+    }
+    UIManager:show(self.plugin_filter_dialog)
+end
+
 function AppStore:togglePatchUpdatesFilter()
     self:ensurePatchUpdatesState()
     self.patch_updates_state.filter_only_outdated = not self.patch_updates_state.filter_only_outdated
@@ -1618,6 +1716,98 @@ function AppStore:togglePatchUpdatesFilter()
     else
         self:showPatchUpdatesDialog()
     end
+end
+
+function AppStore:togglePatchLinkedFilter()
+    self:ensurePatchUpdatesState()
+    self.patch_updates_state.filter_only_linked = not self.patch_updates_state.filter_only_linked
+    if self.patch_updates_menu then
+        self:updatePatchUpdatesDialog()
+    else
+        self:showPatchUpdatesDialog()
+    end
+end
+
+function AppStore:showPatchFilterDialog()
+    self:ensurePatchUpdatesState()
+    local current_outdated = self.patch_updates_state.filter_only_outdated
+    local current_linked = self.patch_updates_state.filter_only_linked
+
+    local function makeCheckbox(enabled)
+        return enabled and "☑ " or "☐ "
+    end
+
+    local buttons = {
+        {
+            {
+                text = makeCheckbox(not current_outdated and not current_linked) .. _("All patches"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.patch_filter_dialog)
+                    self.patch_updates_state.filter_only_outdated = false
+                    self.patch_updates_state.filter_only_linked = false
+                    UIManager:nextTick(function()
+                        if self.patch_updates_menu then
+                            self:updatePatchUpdatesDialog()
+                        else
+                            self:showPatchUpdatesDialog()
+                        end
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = makeCheckbox(current_outdated) .. _("Needs update"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.patch_filter_dialog)
+                    self.patch_updates_state.filter_only_outdated = true
+                    self.patch_updates_state.filter_only_linked = false
+                    UIManager:nextTick(function()
+                        if self.patch_updates_menu then
+                            self:updatePatchUpdatesDialog()
+                        else
+                            self:showPatchUpdatesDialog()
+                        end
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = makeCheckbox(current_linked) .. _("Linked only"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.patch_filter_dialog)
+                    self.patch_updates_state.filter_only_outdated = false
+                    self.patch_updates_state.filter_only_linked = true
+                    UIManager:nextTick(function()
+                        if self.patch_updates_menu then
+                            self:updatePatchUpdatesDialog()
+                        else
+                            self:showPatchUpdatesDialog()
+                        end
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = _("Close"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(self.patch_filter_dialog)
+                end,
+            },
+        },
+    }
+
+    self.patch_filter_dialog = ButtonDialog:new{
+        title = _("Filter Installed Patches"),
+        buttons = buttons,
+    }
+    UIManager:show(self.patch_filter_dialog)
 end
 
 function AppStore:checkAllUpdates()
