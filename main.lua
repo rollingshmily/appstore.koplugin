@@ -6400,19 +6400,23 @@ local function detectPluginFromArchive(reader, repo)
     end
 
     if not plugin_dirname then
-        if plugin_root and plugin_root ~= "" then
+        local repo_name = repo and repo.name
+        local repo_is_plugin_dir = repo_name and repo_name:match("^[%w_%-%.]+%.koplugin$") ~= nil
+        
+        if repo_is_plugin_dir then
+            plugin_dirname = repo_name
+        elseif plugin_root and plugin_root ~= "" then
             local root_basename = plugin_root:match("([^/]+)$")
-            if root_basename and root_basename:match("%.koplugin%-") then
-                plugin_dirname = root_basename:match("(.+%.koplugin)%-")
+            if root_basename and root_basename:match("%.koplugin") then
+                local extracted = root_basename:match("([%w_%-%.]+%.koplugin)")
+                if extracted then
+                    plugin_dirname = extracted
+                end
             end
         end
         
         if not plugin_dirname then
-            local repo_name = repo and repo.name
-            local repo_is_plugin_dir = repo_name and repo_name:match("^[%w_%-%.]+%.koplugin$") ~= nil
-            if repo_is_plugin_dir then
-                plugin_dirname = repo_name
-            elseif plugin_name and plugin_name ~= "" then
+            if plugin_name and plugin_name ~= "" then
                 plugin_dirname = sanitizePluginDirname(plugin_name)
             elseif repo_name then
                 plugin_dirname = sanitizePluginDirname(repo_name)
