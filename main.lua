@@ -7477,10 +7477,204 @@ function AppStore:addToMainMenu(menu_items)
     menu_items.AppStore = {
         sorting_hint = "tools",
         text = _("App Store"),
-        callback = function()
-            self:showBrowser()
-        end,
+        sub_item_table = {
+            {
+                text = _("Open AppStore"),
+                callback = function()
+                    self:showBrowser()
+                end,
+            },
+            {
+                text = _("Check AppStore updates"),
+                callback = function()
+                    self:checkSelfUpdate()
+                end,
+            },
+            {
+                text = _("AppStore settings"),
+                callback = function()
+                    self:showAppStoreSettingsDialog()
+                end,
+            },
+        },
     }
+end
+
+function AppStore:checkSelfUpdate()
+    local SELF_OWNER = "rollingshmily"
+    local SELF_REPO = "appstore.koplugin"
+
+    -- Read current version from _meta.lua
+    local current_version = "1.7.0"
+    local meta_path = self.path and (self.path .. "/_meta.lua") or nil
+    if meta_path then
+        local ok, meta = pcall(dofile, meta_path)
+        if ok and meta and meta.version then
+            current_version = meta.version
+        end
+    end
+
+    local progress = InfoMessage:new{ text = _("Checking for AppStore updates…"), timeout = 0 }
+    UIManager:show(progress)
+    UIManager:forceRePaint()
+
+    NetworkMgr:runWhenOnline(function()
+        local release, err = GitHub.fetchLatestRelease(SELF_OWNER, SELF_REPO)
+        UIManager:close(progress)
+
+        if not release then
+            UIManager:show(InfoMessage:new{
+                text = _("Failed to check updates: ") .. tostring(err),
+                timeout = 6,
+            })
+            return
+        end
+
+        local remote_version = release.tag_name or ""
+        remote_version = remote_version:gsub("^v", "")  -- strip v prefix
+
+        -- Compare versions
+        if remote_version == current_version then
+            UIManager:show(InfoMessage:new{
+                text = string.format(_("AppStore is up to date (v%s)."), current_version),
+                timeout = 4,
+            })
+            return
+        end
+
+        -- Show update dialog
+        local notes = release.body or _("No release notes.")
+        local message = string.format(
+            _("AppStore update available!\n\nCurrent: v%s\nLatest: v%s\n\nRelease notes:\n%s"),
+            current_version, remote_version, notes:sub(1, 500)
+        )
+
+        UIManager:show(ConfirmBox:new{
+            text = message,
+            ok_text = _("Update now"),
+            ok_callback = function()
+                self:performSelfUpdate(release)
+            end,
+            cancel_text = _("Later"),
+        })
+    end)
+end
+
+function AppStore:performSelfUpdate(release)
+    if not release or not release.assets or #release.assets == 0 then
+        -- Fallback: download zipball
+        local url = GitHub.proxyUrl(string.format(
+            "https://github.com/rollingshmily/appstore.koplugin/archive/refs/tags/%s.zip",
+            release.tag_name or "main"
+        ))
+        self:downloadAndInstallUpdate(url)
+        return
+    end
+
+    -- Find the first zip/tar.gz asset
+    local asset_url = nil
+    for _, asset in ipairs(release.assets) do
+        if asset.name and (asset.name:match("%.zip$") or asset.name:match("%.tar%.gz$")) then
+            asset_url = GitHub.proxyUrl(asset.browser_download_url)
+            break
+        end
+    end
+
+    if not asset_url then
+        -- Fallback to zipball
+        asset_url = GitHub.proxyUrl(release.zipball_url or string.format(
+            "https://github.com/rollingshmily/appstore.koplugin/archive/refs/tags/%s.zip",
+            release.tag_name or "main"
+        ))
+    end
+
+    self:downloadAndInstallUpdate(asset_url)
+end
+
+function AppStore:downloadAndInstallUpdate(url)
+    local DataStorage = require("datastorage")
+    local cache_dir = DataStorage:getDataDir() .. "/cache/appstore/downloads"
+    util.makePath(cache_dir)
+    local zip_path = cache_dir .. "/appstore-update.zip"
+
+    local progress = InfoMessage:new{ text = _("Downloading AppStore update…"), timeout = 0 }
+    UIManager:show(progress)
+    UIManager:forceRePaint()
+
+    local ok, err = downloadToFile(url, zip_path)
+    UIManager:close(progress)
+
+    if not ok then
+        util.removeFile(zip_path)
+        UIManager:show(InfoMessage:new{
+            text = _("Download failed: ") .. tostring(err),
+            timeout = 6,
+        })
+        return
+    end
+
+    -- Extract to plugins directory
+    local plugins_dir = DataStorage:getDataDir() .. "/plugins"
+    local target_dir = plugins_dir .. "/appstore.koplugin"
+    local backup_dir = target_dir .. ".bak"
+
+    -- Backup current version
+    if lfs.attributes(target_dir, "mode") == "directory" then
+        deleteDirectoryRecursive(backup_dir)
+        os.rename(target_dir, backup_dir)
+    end
+
+    -- Extract
+    local reader = Archiver.Reader:new()
+    if not reader:open(zip_path) then
+        util.removeFile(zip_path)
+        UIManager:show(InfoMessage:new{
+            text = _("Failed to open update archive."),
+            timeout = 6,
+        })
+        return
+    end
+
+    -- Find the root folder in archive (e.g., appstore.koplugin-main/)
+    local entries = reader:listFiles()
+    local root_prefix = nil
+    for _, entry in ipairs(entries) do
+        if entry:match("appstore%.koplugin") then
+            root_prefix = entry:match("^([^/]+/)")
+            break
+        end
+    end
+
+    -- Extract files
+    local extracted = 0
+    for _, entry in ipairs(entries) do
+        if not entry:match("/$") then  -- skip directories
+            local relative = entry
+            if root_prefix then
+                relative = entry:gsub("^" .. root_prefix:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"), "")
+            end
+            if relative and relative ~= "" then
+                local target_path = target_dir .. "/" .. relative
+                local target_parent = target_path:match("^(.*)/")
+                if target_parent then
+                    util.makePath(target_parent)
+                end
+                reader:extractFile(entry, target_path)
+                extracted = extracted + 1
+            end
+        end
+    end
+
+    reader:close()
+    util.removeFile(zip_path)
+
+    -- Clean up backup
+    deleteDirectoryRecursive(backup_dir)
+
+    UIManager:show(InfoMessage:new{
+        text = string.format(_("AppStore updated successfully! %d files extracted.\nPlease restart KOReader."), extracted),
+        timeout = 8,
+    })
 end
 
 function AppStore:onDispatcherRegisterActions()

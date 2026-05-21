@@ -1,6 +1,5 @@
 # Chinese (Simplified) translation for appstore.koplugin
 # Copyright (C) 2026 rollingshmily
-# This file is distributed under the same license as the appstore.koplugin package.
 #
 msgid ""
 msgstr ""
@@ -105,6 +104,9 @@ msgstr "无法删除未关联的插件，请在设置中启用「允许删除未
 msgid "Check all updates"
 msgstr "检查全部更新"
 
+msgid "Check AppStore updates"
+msgstr "检查应用商店更新"
+
 msgid "Checked %d patches: %d need updates, %d up to date."
 msgstr "已检查 %d 个补丁：%d 个需要更新，%d 个已是最新。"
 
@@ -119,6 +121,9 @@ msgstr "正在检查插件更新…"
 
 msgid "Checking %s…"
 msgstr "正在检查 %s…"
+
+msgid "Checking for AppStore updates…"
+msgstr "正在检查应用商店更新…"
 
 msgid "Check this patch"
 msgstr "检查此补丁"
@@ -165,14 +170,8 @@ msgstr "已删除 %d 个缓存的 README 文件，%d 个删除失败。"
 msgid "Delete patch"
 msgstr "删除补丁"
 
-msgid "Delete patch '%s'?\n\nThis action cannot be undone.\n\nChanges will take effect after restart."
-msgstr "删除补丁「%s」？\n\n此操作不可撤销。\n\n更改将在重启后生效。"
-
 msgid "Delete plugin"
 msgstr "删除插件"
-
-msgid "Delete plugin '%s'?\n\nThis action cannot be undone.\n\nChanges will take effect after restart."
-msgstr "删除插件「%s」？\n\n此操作不可撤销。\n\n更改将在重启后生效。"
 
 msgid "Direct download from repo"
 msgstr "直接从仓库下载"
@@ -195,14 +194,11 @@ msgstr "正在下载插件压缩包…"
 msgid "Downloading release asset…"
 msgstr "正在下载发布资源…"
 
+msgid "Downloading AppStore update…"
+msgstr "正在下载应用商店更新…"
+
 msgid "Download options"
 msgstr "下载选项"
-
-msgid "Download options — %s"
-msgstr "下载选项 — %s"
-
-msgid "Download options — %s (%s)"
-msgstr "下载选项 — %s（%s）"
 
 msgid "[draft]"
 msgstr "[草稿]"
@@ -219,23 +215,17 @@ msgstr "启用插件"
 msgid "Enter item number"
 msgstr "输入项目编号"
 
-msgid "Enter plugin number"
-msgstr "输入插件编号"
-
 msgid "Failed to check %s: %s"
 msgstr "检查 %s 失败：%s"
+
+msgid "Failed to check updates: "
+msgstr "检查更新失败："
 
 msgid "Failed to delete patch: %s"
 msgstr "删除补丁失败：%s"
 
 msgid "Failed to delete plugin: %s"
 msgstr "删除插件失败：%s"
-
-msgid "Failed to disable patch '%s'."
-msgstr "禁用补丁「%s」失败。"
-
-msgid "Failed to enable patch '%s'."
-msgstr "启用补丁「%s」失败。"
 
 msgid "Failed to extract file: "
 msgstr "解压文件失败："
@@ -248,6 +238,9 @@ msgstr "安装补丁失败："
 
 msgid "Failed to open downloaded archive."
 msgstr "无法打开下载的压缩包。"
+
+msgid "Failed to open update archive."
+msgstr "无法打开更新压缩包。"
 
 msgid "Failed to prepare patches directory."
 msgstr "无法准备补丁目录。"
@@ -264,12 +257,6 @@ msgstr "正在获取仓库 %s/%s..."
 msgid "Filter: "
 msgstr "筛选："
 
-msgid "Filter Installed Patches"
-msgstr "筛选已安装补丁"
-
-msgid "Filter Installed Plugins"
-msgstr "筛选已安装插件"
-
 msgid "(fork)"
 msgstr "（分支）"
 
@@ -278,9 +265,6 @@ msgstr "GitHub API 速率限制已超出。在应用商店设置中添加 GitHub
 
 msgid "GitHub API rate limit exceeded. Please wait a few minutes and try again."
 msgstr "GitHub API 速率限制已超出，请稍等几分钟后重试。"
-
-msgid "GitHub token is not configured. README search may be rate limited."
-msgstr "未配置 GitHub 令牌，README 搜索可能受到速率限制。"
 
 msgid "Go"
 msgstr "前往"
@@ -303,32 +287,14 @@ msgstr "安装失败："
 msgid "Installation is currently only supported for plugins."
 msgstr "目前仅支持安装插件。"
 
-msgid "Installed Patches Settings"
-msgstr "已安装补丁设置"
-
-msgid "Installed Plugins Settings"
-msgstr "已安装插件设置"
-
 msgid "Installing plugin…"
 msgstr "正在安装插件…"
 
 msgid "Install patch"
 msgstr "安装补丁"
 
-msgid "Install patch from GitHub"
-msgstr "从 GitHub 安装补丁"
-
-msgid "Install patch from URL"
-msgstr "从 URL 安装补丁"
-
 msgid "Install plugin"
 msgstr "安装插件"
-
-msgid "Install plugin from GitHub"
-msgstr "从 GitHub 安装插件"
-
-msgid "Install plugin from URL"
-msgstr "从 URL 安装插件"
 
 msgid "Invalid selection."
 msgstr "无效选择。"
@@ -339,20 +305,17 @@ msgstr "上次检查：%s"
 msgid "Latest release"
 msgstr "最新版本"
 
+msgid "Later"
+msgstr "稍后"
+
 msgid "Linked only"
 msgstr "仅已关联"
 
 msgid "Local: %s"
 msgstr "本地：%s"
 
-msgid "Local SHA: %s"
-msgstr "本地 SHA：%s"
-
 msgid "Local: %s → Remote: %s"
 msgstr "本地：%s → 远程：%s"
-
-msgid "Local version: %s"
-msgstr "本地版本：%s"
 
 msgid "Manage installed patches"
 msgstr "管理已安装补丁"
@@ -375,32 +338,14 @@ msgstr "从列表关联"
 msgid "Matching entries: %s / %s"
 msgstr "关联进度：%s / %s"
 
-msgid "Matching patches: %s (repos: %s / %s)"
-msgstr "正在关联补丁：%s（仓库：%s / %s）"
-
-msgid "Matching patch: %s — tap to cancel"
-msgstr "正在关联补丁：%s — 点击取消"
-
-msgid "Matching plugin: %s — tap to cancel"
-msgstr "正在关联插件：%s — 点击取消"
-
 msgid "Match patch with GitHub repository"
 msgstr "将补丁与 GitHub 仓库关联"
-
-msgid "Match plugin: %s"
-msgstr "关联插件：%s"
 
 msgid "Match plugin with GitHub repository"
 msgstr "将插件与 GitHub 仓库关联"
 
-msgid "Match this remote patch"
-msgstr "关联此远程补丁"
-
 msgid "Match with this repo"
 msgstr "关联此仓库"
-
-msgid "Match with URL"
-msgstr "通过 URL 关联"
 
 msgid "Minimum stars"
 msgstr "最低星数"
@@ -408,38 +353,11 @@ msgstr "最低星数"
 msgid "Missing download URL for release asset."
 msgstr "缺少发布资源的下载链接。"
 
-msgid "Missing meta path in record."
-msgstr "记录中缺少 meta 路径。"
-
-msgid "Missing patch file info for update."
-msgstr "缺少补丁文件更新信息。"
-
-msgid "Missing README path"
-msgstr "缺少 README 路径"
-
-msgid "Missing repository info for patch update."
-msgstr "缺少补丁更新所需的仓库信息。"
-
-msgid "Missing repository info for update."
-msgstr "缺少更新所需的仓库信息。"
-
 msgid "Missing repository metadata for installation."
 msgstr "缺少安装所需的仓库元数据。"
 
 msgid "Missing repository metadata for patch."
 msgstr "缺少补丁的仓库元数据。"
-
-msgid "Missing repository metadata for patch install."
-msgstr "缺少补丁安装所需的仓库元数据。"
-
-msgid "Missing repository metadata for patch update."
-msgstr "缺少补丁更新所需的仓库元数据。"
-
-msgid "Missing repository metadata for README download."
-msgstr "缺少 README 下载所需的仓库元数据。"
-
-msgid "Missing repository metadata for releases."
-msgstr "缺少版本信息所需的仓库元数据。"
 
 msgid "Missing repository metadata for remote fetch."
 msgstr "缺少远程获取所需的仓库元数据。"
@@ -462,12 +380,6 @@ msgstr "下一页"
 msgid "No cached entries yet."
 msgstr "暂无缓存条目。"
 
-msgid "No cached entries yet. Refresh to fetch from GitHub."
-msgstr "暂无缓存条目，请刷新以从 GitHub 获取。"
-
-msgid "No cached README files to delete."
-msgstr "没有可删除的缓存 README 文件。"
-
 msgid "No entries match current filters."
 msgstr "没有符合当前筛选条件的条目。"
 
@@ -477,17 +389,11 @@ msgstr "没有已关联的补丁可检查。"
 msgid "No matched plugins to check."
 msgstr "没有已关联的插件可检查。"
 
-msgid "No patches found in matching repositories."
-msgstr "在关联的仓库中未找到补丁。"
-
 msgid "No patches need updates."
 msgstr "没有补丁需要更新。"
 
 msgid "No patches to display."
 msgstr "没有可显示的补丁。"
-
-msgid "No patch files found in repository %s."
-msgstr "在仓库 %s 中未找到补丁文件。"
 
 msgid "No plugins need updates."
 msgstr "没有插件需要更新。"
@@ -495,17 +401,11 @@ msgstr "没有插件需要更新。"
 msgid "No plugins to display."
 msgstr "没有可显示的插件。"
 
-msgid "No release assets found. You can still use direct repo download."
-msgstr "未找到发布资源，您仍可以直接从仓库下载。"
-
 msgid "No release notes."
 msgstr "无版本说明。"
 
 msgid "No releases found for this repository."
 msgstr "此仓库没有发布版本。"
-
-msgid "No remote version info for %s."
-msgstr "没有 %s 的远程版本信息。"
 
 msgid "Not matched with a repository."
 msgstr "未关联仓库"
@@ -528,9 +428,6 @@ msgstr "所有者"
 msgid "Page %d / %d"
 msgstr "第 %d / %d 页"
 
-msgid "Page %d/%d"
-msgstr "第 %d/%d 页"
-
 msgid "patch"
 msgstr "补丁"
 
@@ -540,20 +437,11 @@ msgstr "补丁"
 msgid "Patch cache is older than a week, consider refreshing."
 msgstr "补丁缓存超过一周，建议刷新。"
 
-msgid "Patches cached: %s (last update: %s)"
-msgstr "已缓存补丁：%s（上次更新：%s）"
-
 msgid "Patches found: %d"
 msgstr "找到补丁：%d"
 
 msgid "Patch file not found."
 msgstr "未找到补丁文件。"
-
-msgid "Patch file not found in repository."
-msgstr "仓库中未找到补丁文件。"
-
-msgid "Patch file not found locally."
-msgstr "本地未找到补丁文件。"
 
 msgid "Patch matching cancelled."
 msgstr "补丁关联已取消。"
@@ -581,12 +469,6 @@ msgstr "插件缓存超过一周，建议刷新。"
 
 msgid "Plugin folder not found."
 msgstr "未找到插件文件夹。"
-
-msgid "Plugin is not currently loaded, so settings cannot be deleted."
-msgstr "插件当前未加载，无法删除设置。"
-
-msgid "Plugin is not currently loaded, so settings cannot be deleted.\n\nThis plugin may only be available in Reader mode. Try deleting from a document if you want to delete settings."
-msgstr "插件当前未加载，无法删除设置。\n\n此插件可能仅在阅读模式下可用，请在文档中尝试删除设置。"
 
 msgid "Plugins cached: %s (last update: %s)"
 msgstr "已缓存插件：%s（上次更新：%s）"
@@ -630,9 +512,6 @@ msgstr "版本：%s"
 msgid "Releases"
 msgstr "版本列表"
 
-msgid "Releases — %s"
-msgstr "版本列表 — %s"
-
 msgid "Remote check failed: "
 msgstr "远程检查失败："
 
@@ -654,12 +533,6 @@ msgstr "远程 SHA：%s"
 msgid "Remote SHA: %s (checked %s)"
 msgstr "远程 SHA：%s（检查于 %s）"
 
-msgid "Remote version for %s: %s."
-msgstr "%s 的远程版本：%s。"
-
-msgid "Remote version not found."
-msgstr "未找到远程版本。"
-
 msgid "Repo: (not matched)"
 msgstr "仓库：（未关联）"
 
@@ -678,9 +551,6 @@ msgstr "仓库所有者"
 msgid "Repository: %s"
 msgstr "仓库：%s"
 
-msgid "Repository %s not found on GitHub."
-msgstr "在 GitHub 上未找到仓库 %s。"
-
 msgid "Repo: %s/%s"
 msgstr "仓库：%s/%s"
 
@@ -696,26 +566,11 @@ msgstr "在 README 中搜索"
 msgid "Search text"
 msgstr "搜索文本"
 
-msgid "Select a repository patch entry to match with the chosen file."
-msgstr "选择一个仓库补丁条目与所选文件关联。"
-
-msgid "Select a repository to match with the chosen plugin."
-msgstr "选择一个仓库与所选插件关联。"
-
-msgid "Select patch file from %s"
-msgstr "从 %s 选择补丁文件"
-
-msgid "Select plugin to match"
-msgstr "选择要关联的插件"
-
 msgid "Select repository"
 msgstr "选择仓库"
 
 msgid "%s is up to date."
 msgstr "%s 已是最新。"
-
-msgid "%s is up to date (version %s)."
-msgstr "%s 已是最新（版本 %s）。"
 
 msgid "%s needs an update."
 msgstr "%s 需要更新。"
@@ -759,17 +614,8 @@ msgstr "更改将在重启后生效。"
 msgid "Tracked: %d"
 msgstr "已跟踪：%d"
 
-msgid "Unable to determine patch download URL."
-msgstr "无法确定补丁下载链接。"
-
 msgid "Unable to read README file"
 msgstr "无法读取 README 文件"
-
-msgid "Unable to store match for patch."
-msgstr "无法保存补丁关联。"
-
-msgid "Unable to store match for plugin."
-msgstr "无法保存插件关联。"
 
 msgid "unknown"
 msgstr "未知"
@@ -789,9 +635,6 @@ msgstr "未关联的插件无法删除"
 msgid "Unlinked plugins can now be deleted"
 msgstr "现在可以删除未关联的插件"
 
-msgid "Unlinked %s from repository."
-msgstr "已将 %s 从仓库解除关联。"
-
 msgid "Unlink the repo"
 msgstr "解除仓库关联"
 
@@ -807,14 +650,8 @@ msgstr "%s 有更新：远程 %s，已安装 %s。"
 msgid "Update check failed."
 msgstr "更新检查失败。"
 
-msgid "Update check was cancelled"
-msgstr "更新检查已取消"
-
-msgid "Updated patch %s."
-msgstr "已更新补丁 %s。"
-
-msgid "Updated: %s"
-msgstr "更新于：%s"
+msgid "Update now"
+msgstr "立即更新"
 
 msgid "Update patch"
 msgstr "更新补丁"
@@ -822,15 +659,11 @@ msgstr "更新补丁"
 msgid "Update plugin"
 msgstr "更新插件"
 
-msgid "Verifying repository %s/%s..."
-msgstr "正在验证仓库 %s/%s..."
-
 msgid "View README"
 msgstr "查看 README"
 
 msgid "View release notes"
 msgstr "查看版本说明"
-
 
 msgid "View original"
 msgstr "查看原文"
@@ -838,20 +671,15 @@ msgstr "查看原文"
 msgid "Translate to Chinese"
 msgstr "翻译为中文"
 
-msgid "README detected as English. What would you like to do?"
-msgstr "检测到 README 为英文，您想如何处理？"
-
 msgid "Translating…"
 msgstr "正在翻译…"
 
 msgid "Translation failed. Showing original."
 msgstr "翻译失败，显示原文。"
 
-msgid "Failed to save translation."
-msgstr "保存翻译失败。"
+msgid "AppStore is up to date (v%s)."
+msgstr "应用商店已是最新版本（v%s）。"
 
-msgid "Clear translation cache"
-msgstr "清除翻译缓存"
+msgid "AppStore updated successfully! %d files extracted.\\nPlease restart KOReader."
+msgstr "应用商店更新成功！已解压 %d 个文件。请重启 KOReader。"
 
-msgid "Translation cache cleared."
-msgstr "翻译缓存已清除。"
