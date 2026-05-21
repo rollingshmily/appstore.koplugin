@@ -367,7 +367,7 @@ end
 function M.genCustomModelsSubMenu(appstore)
     local items = {
         {
-            text = _("Add a new model…"),
+            text = _("Add a new model..."),
             keep_menu_open = true,
             callback = function(touchmenu_instance)
                 showTemplatePicker(appstore, function()
@@ -394,7 +394,7 @@ function M.genCustomModelsSubMenu(appstore)
     else
         for _, key in ipairs(keys) do
             table.insert(items, {
-                text = string.format("%s%s", selected_key == key and "✓ " or "", key),
+                text = string.format("%s%s", selected_key == key and "* " or "", key),
                 keep_menu_open = true,
                 callback = function(touchmenu_instance)
                     showModelActions(appstore, key, function()

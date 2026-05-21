@@ -253,7 +253,7 @@ function AppStore:refreshPatchUpdates()
         return
     end
     UIManager:show(InfoMessage:new{
-        text = _("Checking patch updates…"),
+        text = _("Checking patch updates..."),
         timeout = 5,
     })
     NetworkMgr:runWhenOnline(function()
@@ -267,7 +267,7 @@ function AppStore:_refreshPatchUpdatesInternal(records)
     local single_context = self.patch_updates_state.single_check_context
         and self.patch_updates_state.single_check_context.filename
     self.patch_updates_state.single_check_context = nil
-    local progress = InfoMessage:new{ text = _("Checking patch updates…"), timeout = 0 }
+    local progress = InfoMessage:new{ text = _("Checking patch updates..."), timeout = 0 }
     UIManager:show(progress)
     UIManager:forceRePaint()
     local remote_info = self.patch_updates_state.remote_info or {}
@@ -620,7 +620,7 @@ function AppStore:buildPatchUpdateItems(summary)
             local remote_entry = patch_item.remote_entry
             local disabled_label = (patch.disabled or isPatchDisabled(patch.filename)) and "[DISABLED] " or ""
             local lines = {
-                string.format("• %s%s", disabled_label, patch.filename or patch.path or _("patch")),
+                string.format("- %s%s", disabled_label, patch.filename or patch.path or _("patch")),
             }
             if record and record.owner and record.repo then
                 table.insert(lines, string.format(_("Repo: %s/%s"), record.owner, record.repo))
@@ -1095,7 +1095,7 @@ function AppStore:getPatchUpdatesSummaryText(summary)
     if self.patch_updates_state and self.patch_updates_state.last_checked then
         table.insert(parts, string.format(_("Last check: %s"), formatTimestamp(self.patch_updates_state.last_checked)))
     end
-    return table.concat(parts, " • ")
+    return table.concat(parts, " | ")
 end
 
 function AppStore:collectUpdateSummary()
@@ -1185,7 +1185,7 @@ function AppStore:getUpdatesSummaryText(summary)
     if self.updates_state and self.updates_state.last_checked then
         table.insert(parts, string.format(_("Last check: %s"), formatTimestamp(self.updates_state.last_checked)))
     end
-    return table.concat(parts, " • ")
+    return table.concat(parts, " | ")
 end
 
 function AppStore:buildUpdateItems(summary)
@@ -1202,7 +1202,7 @@ function AppStore:buildUpdateItems(summary)
             local remote = item.remote
             local disabled_label = isPluginDisabled(plugin.dirname) and "[DISABLED] " or ""
             local lines = {
-                string.format("• %s%s (%s)", disabled_label, plugin.name or plugin.dirname, plugin.dirname),
+                string.format("- %s%s (%s)", disabled_label, plugin.name or plugin.dirname, plugin.dirname),
             }
 
             local local_version_str = plugin.version or _("unknown")
@@ -1460,7 +1460,7 @@ end
 
 function AppStore:showPluginUpdatesSettings()
     local allow_delete_unlinked = AppStoreSettings:readSetting(ALLOW_DELETE_UNLINKED_PLUGINS_KEY) or false
-    local checkbox_text = allow_delete_unlinked and "☑ " or "☐ "
+    local checkbox_text = allow_delete_unlinked and "[x] " or "[ ] "
     local button_dialog
     local buttons = {
         {
@@ -1505,7 +1505,7 @@ function AppStore:showUpdatesDialog()
     local summary = self:collectUpdateSummary()
     local entries = self:buildUpdateBrowserItems(summary)
     local dialog = AppStoreBrowserDialog:new{
-        title = _("App Store · Installed plugins"),
+        title = _("App Store - Installed plugins"),
         items = entries,
         appstore = self,
         page = 1,
@@ -1528,7 +1528,7 @@ end
 
 function AppStore:showPatchUpdatesSettings()
     local allow_delete_unlinked = AppStoreSettings:readSetting(ALLOW_DELETE_UNLINKED_PATCHES_KEY) or false
-    local checkbox_text = allow_delete_unlinked and "☑ " or "☐ "
+    local checkbox_text = allow_delete_unlinked and "[x] " or "[ ] "
     local button_dialog
     local buttons = {
         {
@@ -1579,7 +1579,7 @@ function AppStore:showPatchUpdatesDialog()
     local summary = self:collectPatchUpdateSummary()
     local entries = self:buildPatchUpdateBrowserItems(summary)
     local dialog = AppStoreBrowserDialog:new{
-        title = _("App Store · Installed patches"),
+        title = _("App Store - Installed patches"),
         items = entries,
         appstore = self,
         page = 1,
@@ -1630,7 +1630,7 @@ function AppStore:showPluginFilterDialog()
     local current_linked = self.updates_state.filter_only_linked
 
     local function makeCheckbox(enabled)
-        return enabled and "☑ " or "☐ "
+        return enabled and "[x] " or "[ ] "
     end
 
     local buttons = {
@@ -1720,7 +1720,7 @@ function AppStore:showPatchFilterDialog()
     local current_linked = self.patch_updates_state.filter_only_linked
 
     local function makeCheckbox(enabled)
-        return enabled and "☑ " or "☐ "
+        return enabled and "[x] " or "[ ] "
     end
 
     local buttons = {
@@ -1984,7 +1984,7 @@ function AppStore:checkAllUpdates()
         end
 
         local info = InfoMessage:new{
-            text = _("Checking plugin updates…"),
+            text = _("Checking plugin updates..."),
             timeout = 0,
             dismissable = false,
         }
@@ -2036,7 +2036,7 @@ end
 
 function AppStore:_checkAllUpdatesInternal(records)
     self:ensureUpdatesState()
-    local progress = InfoMessage:new{ text = _("Checking plugin updates…"), timeout = 0 }
+    local progress = InfoMessage:new{ text = _("Checking plugin updates..."), timeout = 0 }
     UIManager:show(progress)
     local remote_info = self.updates_state.remote_info or {}
     for _, record in ipairs(records) do
@@ -2493,7 +2493,7 @@ function AppStore:promptPatchUpdateAction(patch_item)
     local record = patch_item.record
     local remote_entry = patch_item.remote_entry
     local lines = {
-        string.format("• %s", patch.filename or patch.path or _("patch")),
+        string.format("- %s", patch.filename or patch.path or _("patch")),
     }
     if record and record.owner and record.repo then
         table.insert(lines, string.format(_("Matched repo: %s/%s"), record.owner, record.repo))
@@ -2855,13 +2855,13 @@ function AppStore:checkSinglePatch(record)
     NetworkMgr:runWhenOnline(function()
         self:_refreshPatchUpdatesInternal({ copy })
     end)
-    UIManager:show(InfoMessage:new{ text = string.format(_("Checking %s…"), patch_name), timeout = 3 })
+    UIManager:show(InfoMessage:new{ text = string.format(_("Checking %s..."), patch_name), timeout = 3 })
 end
 
 function AppStore:_checkSinglePluginInternal(record)
     self:ensureUpdatesState()
     local plugin_name = record.dirname or _("plugin")
-    local progress = InfoMessage:new{ text = string.format(_("Checking %s…"), plugin_name), timeout = 0 }
+    local progress = InfoMessage:new{ text = string.format(_("Checking %s..."), plugin_name), timeout = 0 }
     UIManager:show(progress)
     local remote_version, remote_repo_ts, err = self:fetchRemoteVersionForRecord(record)
     UIManager:close(progress)
@@ -3587,7 +3587,7 @@ function AppStore:_installPatchFromRepoInternal(repo, patch)
     end
     local target_path = patches_dir .. "/" .. patch.filename
     local temp_path = target_path .. ".download"
-    local progress = InfoMessage:new{ text = _("Downloading patch…"), timeout = 0 }
+    local progress = InfoMessage:new{ text = _("Downloading patch..."), timeout = 0 }
     UIManager:show(progress)
     local ok, download_err = downloadToFile(url, temp_path)
     UIManager:close(progress)
@@ -3770,7 +3770,7 @@ function AppStoreBrowserDialog:init()
     self._list_group = list_group
 
     local first_button = Button:new{
-        text = "◀◀",
+        text = "<<",
         menu_style = true,
         bordersize = 0,
         background = Blitbuffer.COLOR_WHITE,
@@ -3783,7 +3783,7 @@ function AppStoreBrowserDialog:init()
     first_button:enableDisable(self.page > 1)
 
     local prev_button = Button:new{
-        text = "◀",
+        text = "<",
         menu_style = true,
         bordersize = 0,
         background = Blitbuffer.COLOR_WHITE,
@@ -3818,7 +3818,7 @@ function AppStoreBrowserDialog:init()
     }
 
     local next_button = Button:new{
-        text = "▶",
+        text = ">",
         menu_style = true,
         bordersize = 0,
         background = Blitbuffer.COLOR_WHITE,
@@ -3831,7 +3831,7 @@ function AppStoreBrowserDialog:init()
     next_button:enableDisable(self.page < self.total_pages)
 
     local last_button = Button:new{
-        text = "▶▶",
+        text = ">>",
         menu_style = true,
         bordersize = 0,
         background = Blitbuffer.COLOR_WHITE,
@@ -4112,9 +4112,9 @@ local function buildDownloadOptionsTitle(release)
     end
     local date = formatReleaseDate(release)
     if date then
-        return string.format(_("Download options — %s (%s)"), label, date)
+        return string.format(_("Download options - %s (%s)"), label, date)
     end
-    return string.format(_("Download options — %s"), label)
+    return string.format(_("Download options - %s"), label)
 end
 
 function AppStore:promptPluginInstallOptions(repo, release_override)
@@ -4133,7 +4133,7 @@ function AppStore:promptPluginInstallOptions(repo, release_override)
         if release_override then
             release = release_override
         else
-            local progress = InfoMessage:new{ text = _("Fetching release info…"), timeout = 0 }
+            local progress = InfoMessage:new{ text = _("Fetching release info..."), timeout = 0 }
             UIManager:show(progress)
             UIManager:forceRePaint()
             release, release_err = GitHub.fetchLatestRelease(owner, repo.name)
@@ -4210,7 +4210,7 @@ function AppStore:promptPluginInstallOptions(repo, release_override)
         -- Always offer a way to switch to a different release; the release
         -- list itself handles the case where no releases are available.
         table.insert(buttons, {
-            text = _("Other releases…"),
+            text = _("Other releases..."),
             callback = function()
                 UIManager:close(dialog)
                 self:showReleaseListDialog(repo, release)
@@ -4257,7 +4257,7 @@ function AppStore:showReleaseListDialog(repo, current_release)
     end
 
     NetworkMgr:runWhenOnline(function()
-        local progress = InfoMessage:new{ text = _("Fetching releases…"), timeout = 0 }
+        local progress = InfoMessage:new{ text = _("Fetching releases..."), timeout = 0 }
         UIManager:show(progress)
         UIManager:forceRePaint()
 
@@ -4332,7 +4332,7 @@ function AppStore:renderReleaseListPage(repo, releases, page, current_release)
         local nav_row = {}
         if page > 1 then
             table.insert(nav_row, {
-                text = "◀  " .. _("Prev"),
+                text = "<  " .. _("Prev"),
                 background = Blitbuffer.COLOR_WHITE,
                 callback = function()
                     UIManager:close(dialog)
@@ -4347,7 +4347,7 @@ function AppStore:renderReleaseListPage(repo, releases, page, current_release)
         })
         if page < total_pages then
             table.insert(nav_row, {
-                text = _("Next") .. "  ▶",
+                text = _("Next") .. "  >",
                 background = Blitbuffer.COLOR_WHITE,
                 callback = function()
                     UIManager:close(dialog)
@@ -4370,7 +4370,7 @@ function AppStore:renderReleaseListPage(repo, releases, page, current_release)
 
     local title_label = repo.full_name or repo.name or _("Releases")
     dialog = ButtonDialog:new{
-        title = string.format(_("Releases — %s"), title_label),
+        title = string.format(_("Releases - %s"), title_label),
         title_align = "center",
         buttons = button_rows,
     }
@@ -4398,7 +4398,7 @@ function AppStore:installPluginFromReleaseAsset(repo, release, asset)
         local safe_name = tostring(asset.name or (repo.name .. "-asset.zip")):gsub("[^%w_%-%.]", "_")
         local zip_path = string.format("%s/%s-%d.zip", downloads_dir, safe_name, os.time())
 
-        local progress = InfoMessage:new{ text = _("Downloading release asset…"), timeout = 0 }
+        local progress = InfoMessage:new{ text = _("Downloading release asset..."), timeout = 0 }
         UIManager:show(progress)
         local ok, err = downloadToFile(url, zip_path)
         UIManager:close(progress)
@@ -4430,7 +4430,7 @@ function AppStore:installPluginFromReleaseAsset(repo, release, asset)
             end
         end
 
-        local install_progress = InfoMessage:new{ text = _("Installing plugin…"), timeout = 0 }
+        local install_progress = InfoMessage:new{ text = _("Installing plugin..."), timeout = 0 }
         UIManager:show(install_progress)
         local ok_extract, dest_or_err = extractPluginToUserDir(reader, info)
         reader:close()
@@ -4526,7 +4526,7 @@ local function truncateText(text, max_len)
     if #trimmed <= max_len then
         return trimmed
     end
-    return trimmed:sub(1, max_len - 1) .. "…"
+    return trimmed:sub(1, max_len - 1) .. "..."
 end
 
 formatTimestamp = function(ts)
@@ -5238,7 +5238,7 @@ function AppStore:getFilterSummary()
     end
     local stars = tonumber(filters.min_stars) or 0
     if stars > 0 then
-        table.insert(parts, string.format(_([[≥ %s ⭐]]), tostring(stars)))
+        table.insert(parts, string.format(_([[stars >= %s]]), tostring(stars)))
     end
     if #parts == 0 then
         return _([[Filters: (none)]])
@@ -5280,12 +5280,12 @@ local function formatRepoEntry(repo, opts)
     local lines = {}
     local title = repo.full_name or repo.name or _("Repository")
     local stars = tonumber(repo.stars) or 0
-    local meta = string.format("⭐ %d", stars)
+    local meta = string.format("stars %d", stars)
     if repoIsFork(repo) then
         -- Keep the badge short; the browser list has limited horizontal room.
-        meta = meta .. " · " .. _("(fork)")
+        meta = meta .. " - " .. _("(fork)")
     end
-    table.insert(lines, string.format("• %s — %s", title, meta))
+    table.insert(lines, string.format("- %s - %s", title, meta))
     local description = normalizeDescription(repo.description)
     if include_description and description ~= "" then
         table.insert(lines, "  " .. truncateText(description, 200))
@@ -5492,7 +5492,7 @@ end
 
 function AppStore:makePatchMenuItem(repo, patch)
     local stars = tonumber(repo.stars) or (repo.data and tonumber(repo.data.stargazers_count)) or 0
-    local lines = { string.format("• %s — ⭐ %d", patch.filename, stars) }
+    local lines = { string.format("- %s - stars %d", patch.filename, stars) }
     if patch.display_path and patch.display_path ~= patch.filename then
         table.insert(lines, "  " .. patch.display_path)
     end
@@ -5525,7 +5525,7 @@ function AppStore:buildBrowserEntries()
         if self.match_context.kind == "plugin" and self.match_context.plugin then
             local plugin = self.match_context.plugin
             table.insert(items, {
-                text = string.format(_("Matching plugin: %s — tap to cancel"), plugin.name or plugin.dirname or _("plugin")),
+                text = string.format(_("Matching plugin: %s - tap to cancel"), plugin.name or plugin.dirname or _("plugin")),
                 callback = function()
                     self:cancelMatchContext()
                     self:closeBrowserMenu()
@@ -5537,7 +5537,7 @@ function AppStore:buildBrowserEntries()
         elseif self.match_context.kind == "patch" and self.match_context.patch and kind == "patch" then
             local patch = self.match_context.patch
             table.insert(items, {
-                text = string.format(_("Matching patch: %s — tap to cancel"), patch.filename or patch.path or _("patch")),
+                text = string.format(_("Matching patch: %s - tap to cancel"), patch.filename or patch.path or _("patch")),
                 callback = function()
                     self:cancelMatchContext()
                     self:closeBrowserMenu()
@@ -5550,7 +5550,7 @@ function AppStore:buildBrowserEntries()
     end
 
     table.insert(items, {
-        text = other_kind == "plugin" and "↔ " .. _("Switch to plugins tab") or "↔ " .. _("Switch to patches tab"),
+        text = other_kind == "plugin" and "<-> " .. _("Switch to plugins tab") or "<-> " .. _("Switch to patches tab"),
         callback = function()
             self.browser_state.kind = other_kind
             self.browser_state.page = 1
@@ -5571,7 +5571,7 @@ function AppStore:buildBrowserEntries()
             NetworkMgr:runWhenOnline(function()
                 UIManager:nextTick(function()
                     local start_notice = InfoMessage:new{
-                        text = _("Caching started, please wait…"),
+                        text = _("Caching started, please wait..."),
                         timeout = 5,
                     }
                     UIManager:show(start_notice)
@@ -5613,7 +5613,7 @@ function AppStore:buildBrowserEntries()
     end
 
     table.insert(items, {
-        text = string.format(_("%s · %s (hold to sort)"), self:getFilterSummary(), self:getSortSummary()),
+        text = string.format(_("%s - %s (hold to sort)"), self:getFilterSummary(), self:getSortSummary()),
         callback = function()
             self:showFilterDialog()
         end,
@@ -5741,7 +5741,7 @@ function AppStore:showBrowser(kind)
             end)
         end
     end
-    local title = self.browser_state.kind == "plugin" and _("App Store · Plugins") or _("App Store · Patches")
+    local title = self.browser_state.kind == "plugin" and _("App Store - Plugins") or _("App Store - Patches")
     local items, total_pages = self:buildBrowserEntries()
     local dialog = AppStoreBrowserDialog:new{
         title = title,
@@ -6418,12 +6418,12 @@ function AppStore:renderRepoLines(descriptors)
     end
     local lines = {}
     for _, repo in ipairs(descriptors) do
-        local badge = string.format("⭐ %s", tostring(repo.stars or 0))
+        local badge = string.format("stars %s", tostring(repo.stars or 0))
         local fullname = repo.full_name or (repo.owner and repo.name and (repo.owner .. "/" .. repo.name)) or (repo.name or _("Unknown"))
         local raw_description = normalizeDescription(repo.description)
         local desc = truncateText(raw_description)
-        local language = repo.language and (" · " .. repo.language) or ""
-        local line = string.format("%s — %s%s", fullname, badge, language)
+        local language = repo.language and (" - " .. repo.language) or ""
+        local line = string.format("%s - %s%s", fullname, badge, language)
         if desc ~= "" then
             line = line .. "\n  " .. desc
         end
@@ -6813,7 +6813,7 @@ function AppStore:_installPluginFromRepoInternal(repo)
     local zip_path = string.format("%s/%s-%d.zip", downloads_dir, repo.name, os.time())
 
     local progress = InfoMessage:new{
-        text = _("Downloading plugin archive…"),
+        text = _("Downloading plugin archive..."),
         timeout = 0,
     }
     UIManager:show(progress)
@@ -6861,7 +6861,7 @@ function AppStore:_installPluginFromRepoInternal(repo)
     end
 
     local install_progress = InfoMessage:new{
-        text = _("Installing plugin…"),
+        text = _("Installing plugin..."),
         timeout = 0,
     }
     UIManager:show(install_progress)
@@ -7022,9 +7022,9 @@ local function formatReadmeForTextBox(text)
             in_code = not in_code
             if in_code then
                 table.insert(lines, "")
-                table.insert(lines, "    ─── code ───")
+                table.insert(lines, "    --- code ---")
             else
-                table.insert(lines, "    ───────────")
+                table.insert(lines, "    -----------")
                 table.insert(lines, "")
             end
         elseif in_code then
@@ -7034,16 +7034,16 @@ local function formatReadmeForTextBox(text)
             if hashes and heading_text then
                 table.insert(lines, "")
                 table.insert(lines, heading_text)
-                table.insert(lines, ("─"):rep(math.min(#heading_text, 28)))
+                table.insert(lines, ("-"):rep(math.min(#heading_text, 28)))
                 table.insert(lines, "")
             else
-                line = line:gsub("^%s*[%-%*+]%s+", "  • ")
+                line = line:gsub("^%s*[%-%*+]%s+", "  - ")
                 line = line:gsub("^%s*(%d+)%.%s+", "  %1. ")
                 line = line:gsub("%*%*([^%*]+)%*%*", "%1")
                 line = line:gsub("__([^_]+)__", "%1")
-                line = line:gsub("`([^`]+)`", "‹%1›")
+                line = line:gsub("`([^`]+)`", "`%1`")
                 if line:match("^%s*[-=][-=][-=]+%s*$") then
-                    table.insert(lines, "────────────────")
+                    table.insert(lines, "----------------")
                 else
                     table.insert(lines, line)
                 end
@@ -7289,7 +7289,7 @@ end
 function AppStore:openReadmeInDialog(repo, text)
     local owner = repo and (repo.owner or (repo.data and repo.data.owner and repo.data.owner.login))
     local repo_name = repo and repo.name
-    local title = (owner and repo_name) and string.format("%s/%s · README", owner, repo_name) or _("README")
+    local title = (owner and repo_name) and string.format("%s/%s - README", owner, repo_name) or _("README")
     self:showReadmeDialog(title, text, repo)
 end
 
@@ -7303,7 +7303,7 @@ function AppStore:translateReadmeInDialog(readme_dialog)
     end
     local Trapper = require("ui/trapper")
     local progress = InfoMessage:new{
-        text = _("Translating…"),
+        text = _("Translating..."),
         timeout = 0,
         dismissable = false,
     }
@@ -7383,7 +7383,7 @@ end
 -- `fork:only stars:>=1` qualifier keeps that filtering on GitHub's side.
 -- When the ecosystem grows past ~1000 results per sub-query the inner
 -- adaptive exhaustiveSearch handles the overflow by falling back to star
--- splits and/or date bisection — see the 4-way STAR_SPLIT_SUFFIXES below.
+-- splits and/or date bisection - see the 4-way STAR_SPLIT_SUFFIXES below.
 local NON_FORK_SUFFIX = ""
 local FORK_WITH_STARS_SUFFIX = " fork:only stars:>=1"
 local FORK_ANY_STARS_SUFFIX = " fork:only"
@@ -7508,7 +7508,7 @@ local function exhaustiveSearch(base_query, append, date_from, date_to, depth)
         return
     end
 
-    -- total_count >= 1000 — bisect by created date. We skip paginating the
+    -- total_count >= 1000 - bisect by created date. We skip paginating the
     -- flat query (the legacy probe path did the same) because the bisected
     -- sub-queries will cover the remaining ranks via their date windows.
     logger.info("AppStore: query has", total_count, "results (>=1000), bisecting by date", query)
@@ -7737,7 +7737,7 @@ function AppStore:checkSelfUpdate()
     NetworkMgr:runWhenOnline(function()
         local Trapper = require("ui/trapper")
         Trapper:wrap(function()
-            Trapper:info(_("Checking for AppStore updates…"))
+            Trapper:info(_("Checking for AppStore updates..."))
             local manifest, err = Updater.fetchManifest(SELF_UPDATE_URL)
             Trapper:reset()
             if not manifest then

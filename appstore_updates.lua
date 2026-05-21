@@ -146,7 +146,7 @@ function AppStoreUpdatesDialog:init()
 
     self.title_bar = TitleBar:new{
         width = self.width,
-        title = self.title or _("AppStore · Updates"),
+        title = self.title or _("AppStore - Updates"),
         fullscreen = false,
         with_bottom_line = true,
         close_callback = function()

@@ -1,13 +1,13 @@
 {
-  "version": "1.9.9",
+  "version": "1.9.10",
   "files": [
     {
       "path": "_meta.lua",
-      "sha256": "13ae642d3f0c2a8e683d2c6b8556b27df1f24460f251b4b446d14109d918e114"
+      "sha256": "d6dfb64066acc3193b5bed7e567a0380fedaaa22c360fdc644db5c42bba8ee87"
     },
     {
       "path": "main.lua",
-      "sha256": "e43f4127760065882b12f1b3212864b07c0b7cf08744d491ef98f85c094667b9"
+      "sha256": "e27e6e33600d0cb7e7595557b96d791552a768d95947ea81e1d8cf59baa3b87f"
     },
     {
       "path": "appstore_cache.lua",
@@ -27,7 +27,7 @@
     },
     {
       "path": "appstore_modeleditor.lua",
-      "sha256": "f5989830c88907e8eeddf36fa6838ae401320706014d7c9ce18c74ec9a3ff1ea"
+      "sha256": "11ec697c8bb4e7f7c47fe98c6b4b288f96fd89c22aacc7b480dd8cd91c4efbeb"
     },
     {
       "path": "appstore_net_github.lua",
@@ -43,11 +43,11 @@
     },
     {
       "path": "appstore_updates.lua",
-      "sha256": "97ebcc15174c136f45a191aca766fab3871ac6c4331c252f04404d8a0eee670a"
+      "sha256": "970c6f0c6ca50cc06e5b170975c469aa5c23dd0fccde250583cbd904fda3c080"
     },
     {
       "path": "l10n/zh_CN.po",
-      "sha256": "02ce18ad80cb8d19d0746e523e8bf4e7cef23208b0e220845cfb4909dc45dc83"
+      "sha256": "d2b15f76ea0cdde74e17faead01ab061c45c578db983ab96d3c2a5f795648052"
     },
     {
       "path": "README.md",
