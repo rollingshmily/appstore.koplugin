@@ -6,7 +6,6 @@ local logger = require("logger")
 local DataStorage = require("datastorage")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
-local LuaSettings = require("luasettings")
 
 local ok_cfg, AppStoreConfig = pcall(require, "appstore_configuration")
 if not ok_cfg then
@@ -14,9 +13,6 @@ if not ok_cfg then
 end
 
 local Translator = {}
-
-local SETTINGS_PATH = DataStorage:getSettingsDir() .. "/appstore.lua"
-local AppStoreSettings = LuaSettings and LuaSettings:open(SETTINGS_PATH) or nil
 
 local CACHE_DIR = DataStorage:getDataDir() .. "/cache/appstore/translations"
 local MYMEMORY_API_URL = "https://api.mymemory.translated.net/get"
@@ -126,12 +122,11 @@ end
 local function getOpenAISettings()
     local cfg = AppStoreConfig.translator or {}
     local openai = cfg.openai_compatible or cfg.openai or {}
-    local saved = AppStoreSettings and AppStoreSettings:readSetting("translator_settings") or {}
     return {
-        provider = saved.provider or "openai_compatible",
-        base_url = saved.base_url or openai.base_url or "https://openrouter.ai/api/v1/chat/completions",
-        api_key = saved.api_key or openai.api_key or "",
-        model = saved.model or openai.model or "qwen/qwen3-14b:free",
+        provider = "openai_compatible",
+        base_url = openai.base_url or "https://openrouter.ai/api/v1/chat/completions",
+        api_key = openai.api_key or "",
+        model = openai.model or "qwen/qwen3-14b:free",
         max_tokens = openai.max_tokens or 8192,
         temperature = openai.temperature or 0.2,
         extra_headers = openai.extra_headers or {},
