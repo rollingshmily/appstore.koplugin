@@ -7032,7 +7032,6 @@ function AppStore:showReadme(repo)
             UIManager:show(InfoMessage:new{ text = _("README download failed: ") .. tostring(text_or_err), timeout = 4 })
             return
         end
-        self:closeBrowserMenu()
         self:showReadmeWithTranslation(text_or_err, repo)
     end)
 end
