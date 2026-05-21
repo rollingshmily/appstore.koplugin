@@ -1,13 +1,13 @@
 {
-  "version": "1.8.2",
+  "version": "1.8.3",
   "files": [
     {
       "path": "_meta.lua",
-      "sha256": "2566461b85b22a733b0a004b89ba4bc5cb47ac6a99f9defa5e1952e2008a9e1b"
+      "sha256": "a2453c966b82264132628ef638fdfb181b69c5aa21ef9898d13430d20c705e79"
     },
     {
       "path": "main.lua",
-      "sha256": "56d184a49a6702e238c75eb5af262c0179642d67ca217f6f78e4afea103d0406"
+      "sha256": "6d3e4bc6ca242830dbd9b2a31a0a3fc32748978baaf6dcaa003a11fb40affd3b"
     },
     {
       "path": "appstore_cache.lua",

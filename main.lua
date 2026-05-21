@@ -7036,19 +7036,89 @@ function AppStore:showReadme(repo)
     end)
 end
 
+local AppStoreReadmeDialog = FocusManager:extend{
+    title = nil,
+    text = nil,
+}
+
+function AppStoreReadmeDialog:init()
+    self.show_parent = self
+    local screen_w = Device.screen:getWidth()
+    local screen_h = Device.screen:getHeight()
+    self.dimen = Geom:new{ x = 0, y = 0, w = screen_w, h = screen_h }
+
+    if Device:hasKeys() then
+        self.key_events.Close = { { Input.group.Back } }
+        if Device:hasFewKeys() then
+            self.key_events.Close = { { "Left" } }
+        end
+    end
+
+    self.title_bar = TitleBar:new{
+        width = screen_w,
+        title = self.title or _("README"),
+        fullscreen = false,
+        with_bottom_line = true,
+        close_callback = function()
+            UIManager:close(self)
+        end,
+        show_parent = self,
+    }
+
+    local content_width = math.floor(screen_w * 0.94)
+    local content_height = screen_h - self.title_bar:getHeight() - 2 * Size.padding.default
+    local face = TextWidget.getDefaultFace and TextWidget:getDefaultFace()
+    if not face and Font and Font.getFace then
+        face = Font:getFace("infofont")
+    end
+    local box = TextBoxWidget:new{
+        text = self.text or "",
+        width = content_width - 2 * Size.padding.default,
+        face = face,
+    }
+    local frame = FrameContainer:new{
+        padding = Size.padding.default,
+        bordersize = 0,
+        box,
+    }
+    self.scroller = ScrollableContainer:new{
+        dimen = Geom:new{ w = screen_w, h = content_height },
+        show_parent = self,
+        frame,
+    }
+    self.cropping_widget = self.scroller
+    self[1] = FrameContainer:new{
+        background = Blitbuffer.COLOR_WHITE,
+        bordersize = 0,
+        VerticalGroup:new{
+            self.title_bar,
+            CenterContainer:new{
+                dimen = Geom:new{ w = screen_w, h = content_height },
+                self.scroller,
+            },
+        },
+    }
+end
+
+function AppStoreReadmeDialog:onClose()
+    UIManager:close(self)
+    return true
+end
+
+function AppStoreReadmeDialog:onTapClose()
+    UIManager:close(self)
+    return true
+end
+
 function AppStore:showReadmeDialog(title, text)
     if not text or text == "" then
         UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
         return
     end
-    local dialog
-    dialog = ConfirmBox:new{
-        text = title or _("README"),
-        cancel_text = _("Close"),
-        no_ok_button = true,
-    }
-    dialog:addWidget(makeScrollableTextBoxForDialog(dialog, softWrapLongTokens(text, 80)))
-    UIManager:show(dialog)
+    UIManager:show(AppStoreReadmeDialog:new{
+        title = title or _("README"),
+        text = softWrapLongTokens(text, 100),
+    })
 end
 
 function AppStore:openReadmeInDialog(repo, text)
