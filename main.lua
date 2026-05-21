@@ -3775,8 +3775,6 @@ function AppStoreBrowserDialog:init()
                     background = Blitbuffer.COLOR_LIGHT_GRAY,
                     dimen = Geom:new{ w = entry_width, h = Size.line.thin },
                 }
-            else
-                list_group[#list_group + 1] = VerticalSpan:new{ width = Size.span.vertical_default }
             end
         end
     end
@@ -3864,7 +3862,7 @@ function AppStoreBrowserDialog:init()
 
     local title_height = self.title_bar:getHeight()
     local footer_height = math.max(first_button:getSize().h, prev_button:getSize().h, page_button:getSize().h, next_button:getSize().h, last_button:getSize().h)
-    local vertical_padding = 3 * Size.span.vertical_default
+    local vertical_padding = Size.span.vertical_default
     local body_height = self.screen_h - title_height - footer_height - vertical_padding
     if body_height < math.floor(self.screen_h * 0.5) then
         body_height = math.floor(self.screen_h * 0.5)
@@ -3891,9 +3889,7 @@ function AppStoreBrowserDialog:init()
 
     self.content = VerticalGroup:new{
         self.title_bar,
-        VerticalSpan:new{ width = Size.span.vertical_default },
         self.list_scroller,
-        VerticalSpan:new{ width = Size.span.vertical_default },
         self.footer,
     }
 
@@ -7144,23 +7140,38 @@ function AppStoreReadmeDialog:init()
     if page_count > 1 then
         page_title = string.format("%s (%d/%d)", page_title, self.page or 1, page_count)
     end
-    self.title_bar = TitleBar:new{
-        width = screen_w,
-        title = page_title,
-        fullscreen = false,
-        with_bottom_line = true,
-        left_icon = "appbar.menu",
-        left_icon_tap_callback = function()
-            self:showReadmeActions()
+    local translate_button = Button:new{
+        text = (self.mode == "translated") and _("原") or _("译"),
+        menu_style = true,
+        bordersize = 0,
+        background = Blitbuffer.COLOR_WHITE,
+        callback = function()
+            self:onTranslateButton()
         end,
-        close_callback = function()
+    }
+    local close_button = Button:new{
+        text = "✕",
+        menu_style = true,
+        bordersize = 0,
+        background = Blitbuffer.COLOR_WHITE,
+        callback = function()
             UIManager:close(self)
         end,
-        show_parent = self,
+    }
+    self.header = HorizontalGroup:new{
+        translate_button,
+        HorizontalSpan:new{ width = Size.span.horizontal_default },
+        TextWidget:new{
+            text = page_title,
+            width = screen_w - translate_button:getSize().w - close_button:getSize().w - 4 * Size.span.horizontal_default,
+            face = Font:getFace("smallinfofont"),
+        },
+        HorizontalSpan:new{ width = Size.span.horizontal_default },
+        close_button,
     }
 
-    local content_width = math.floor(screen_w * 0.94)
-    local content_height = screen_h - self.title_bar:getHeight() - 2 * Size.padding.default
+    local content_width = math.floor(screen_w * 0.96)
+    local content_height = screen_h - self.header:getSize().h - Size.padding.default
     local face = TextWidget.getDefaultFace and TextWidget:getDefaultFace()
     if not face and Font and Font.getFace then
         face = Font:getFace("infofont")
@@ -7188,7 +7199,7 @@ function AppStoreReadmeDialog:init()
         padding = 0,
         dimen = self.dimen:copy(),
         VerticalGroup:new{
-            self.title_bar,
+            self.header,
             CenterContainer:new{
                 dimen = Geom:new{ w = screen_w, h = content_height },
                 self.scroller,
@@ -7238,6 +7249,19 @@ function AppStoreReadmeDialog:onRight()
     return self:showPage(1)
 end
 
+function AppStoreReadmeDialog:onTranslateButton()
+    if self.mode == "translated" then
+        return self:replaceContent("original", 1)
+    end
+    if self.translated_text then
+        return self:replaceContent("translated", 1)
+    end
+    if self.appstore then
+        self.appstore:translateReadmeInDialog(self)
+    end
+    return true
+end
+
 function AppStoreReadmeDialog:replaceContent(mode, page)
     local source = mode == "translated" and self.translated_text or self.original_text
     self.mode = mode or "original"
@@ -7255,48 +7279,6 @@ function AppStoreReadmeDialog:replaceContent(mode, page)
         page = self.page,
     })
     return true
-end
-
-function AppStoreReadmeDialog:showReadmeActions()
-    local buttons = {}
-    if self.mode == "translated" then
-        table.insert(buttons, {
-            {
-                text = _("View original"),
-                callback = function()
-                    if self.actions_dialog then UIManager:close(self.actions_dialog) end
-                    self:replaceContent("original", 1)
-                end,
-            },
-        })
-    else
-        table.insert(buttons, {
-            {
-                text = self.translated_text and _("View translation") or _("Translate to Chinese"),
-                callback = function()
-                    if self.actions_dialog then UIManager:close(self.actions_dialog) end
-                    if self.translated_text then
-                        self:replaceContent("translated", 1)
-                    elseif self.appstore then
-                        self.appstore:translateReadmeInDialog(self)
-                    end
-                end,
-            },
-        })
-    end
-    table.insert(buttons, {
-        {
-            text = _("Close"),
-            callback = function()
-                if self.actions_dialog then UIManager:close(self.actions_dialog) end
-            end,
-        },
-    })
-    self.actions_dialog = ButtonDialog:new{
-        title = _("README"),
-        buttons = buttons,
-    }
-    UIManager:show(self.actions_dialog)
 end
 
 function AppStore:showReadmeDialog(title, text, repo)
