@@ -7036,9 +7036,38 @@ function AppStore:showReadme(repo)
     end)
 end
 
+local function splitReadmePages(text, max_len)
+    max_len = max_len or 6000
+    local pages = {}
+    text = tostring(text or "")
+    while #text > max_len do
+        local cut = max_len
+        local search_start = math.max(1, max_len - 1200)
+        for i = max_len, search_start, -1 do
+            local ch = text:sub(i, i)
+            if ch == "\n" then
+                cut = i
+                break
+            end
+            if ch == "." or ch == "!" or ch == "?" or ch == "。" or ch == "！" or ch == "？" then
+                cut = i
+                break
+            end
+        end
+        table.insert(pages, text:sub(1, cut))
+        text = text:sub(cut + 1)
+    end
+    if text ~= "" or #pages == 0 then
+        table.insert(pages, text)
+    end
+    return pages
+end
+
 local AppStoreReadmeDialog = FocusManager:extend{
+    appstore = nil,
     title = nil,
-    text = nil,
+    pages = nil,
+    page = 1,
 }
 
 function AppStoreReadmeDialog:init()
@@ -7054,9 +7083,14 @@ function AppStoreReadmeDialog:init()
         end
     end
 
+    local page_count = #(self.pages or {})
+    local page_title = self.title or _("README")
+    if page_count > 1 then
+        page_title = string.format("%s (%d/%d)", page_title, self.page or 1, page_count)
+    end
     self.title_bar = TitleBar:new{
         width = screen_w,
-        title = self.title or _("README"),
+        title = page_title,
         fullscreen = false,
         with_bottom_line = true,
         close_callback = function()
@@ -7071,8 +7105,9 @@ function AppStoreReadmeDialog:init()
     if not face and Font and Font.getFace then
         face = Font:getFace("infofont")
     end
+    local page_text = (self.pages and self.pages[self.page or 1]) or ""
     local box = TextBoxWidget:new{
-        text = self.text or "",
+        text = softWrapLongTokens(page_text, 100),
         width = content_width - 2 * Size.padding.default,
         face = face,
     }
@@ -7110,14 +7145,54 @@ function AppStoreReadmeDialog:onTapClose()
     return true
 end
 
+function AppStoreReadmeDialog:showPage(delta)
+    local count = #(self.pages or {})
+    if count <= 1 then
+        return true
+    end
+    local next_page = math.max(1, math.min(count, (self.page or 1) + delta))
+    if next_page == self.page then
+        return true
+    end
+    UIManager:close(self)
+    UIManager:show(AppStoreReadmeDialog:new{
+        appstore = self.appstore,
+        title = self.title,
+        pages = self.pages,
+        page = next_page,
+    })
+    return true
+end
+
+function AppStoreReadmeDialog:onSwipe(arg, ges)
+    local direction = ges and ges.direction
+    if direction == "left" or direction == "up" then
+        return self:showPage(1)
+    elseif direction == "right" or direction == "down" then
+        return self:showPage(-1)
+    end
+    return false
+end
+
+function AppStoreReadmeDialog:onLeft()
+    return self:showPage(-1)
+end
+
+function AppStoreReadmeDialog:onRight()
+    return self:showPage(1)
+end
+
 function AppStore:showReadmeDialog(title, text)
     if not text or text == "" then
         UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
         return
     end
+    local pages = splitReadmePages(text, 6000)
     UIManager:show(AppStoreReadmeDialog:new{
+        appstore = self,
         title = title or _("README"),
-        text = softWrapLongTokens(text, 100),
+        pages = pages,
+        page = 1,
     })
 end
 
