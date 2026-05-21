@@ -1,21 +1,21 @@
 {
-  "version": "1.9.10",
+  "version": "1.9.11",
   "files": [
     {
       "path": "_meta.lua",
-      "sha256": "d6dfb64066acc3193b5bed7e567a0380fedaaa22c360fdc644db5c42bba8ee87"
+      "sha256": "1cbab5e0402ebb73231d85670f78fefa0e7f44ec7457e127d155e0eb02ab4016"
     },
     {
       "path": "main.lua",
-      "sha256": "e27e6e33600d0cb7e7595557b96d791552a768d95947ea81e1d8cf59baa3b87f"
+      "sha256": "4d5c2c7611e6a4de8e5ace352587925d0bc7a100044ad746cf15e00e5692ec4a"
     },
     {
       "path": "appstore_cache.lua",
-      "sha256": "ed15cea01ec46c2196b50f0a56f4e59887dfd8e932e5113dcde6c7037ac68f18"
+      "sha256": "7066f93eb751b9d0b79864460e69dcf90a2817817e0e135e148fc6f4ab52c50b"
     },
     {
       "path": "appstore_configuration.sample.lua",
-      "sha256": "04b7433a26c275702b96e08146a4d13a47c06f9b7b1f281533dc737d6b147c31"
+      "sha256": "f53ce9cb74eb69d24a72b590df3751eaa5fb2a2b857896e9c2fe67d3a88d2742"
     },
     {
       "path": "appstore_gettext.lua",
@@ -23,7 +23,7 @@
     },
     {
       "path": "appstore_installs.lua",
-      "sha256": "296aaa1fa0ab6734e9a6c329de364c8458fc10fb287d5810024018f4025cc4ff"
+      "sha256": "fd5e9312a42802af0ca54268e1af411aface361e35e50ddbbe8f3b0e9d491331"
     },
     {
       "path": "appstore_modeleditor.lua",
@@ -31,11 +31,11 @@
     },
     {
       "path": "appstore_net_github.lua",
-      "sha256": "7f5fed77e45dee9a229442fb49ef854102b0217669a9da954526bee15dba1ac2"
+      "sha256": "a4ff379bcc486567f09919c79600cff7af156a44416921510aad215e835c2950"
     },
     {
       "path": "appstore_repo_content.lua",
-      "sha256": "40fa4af25a0dc86164b62e14d5dc7bdc34a7859d1c4ef371384b0d38b7be4fcf"
+      "sha256": "8a98212454df9f77378588dcc0b4444b2e47bc197da7e9ec396af68855beab00"
     },
     {
       "path": "appstore_translator.lua",
@@ -43,11 +43,11 @@
     },
     {
       "path": "appstore_updates.lua",
-      "sha256": "970c6f0c6ca50cc06e5b170975c469aa5c23dd0fccde250583cbd904fda3c080"
+      "sha256": "5096d00cc2ed98e6d45caf8ccfe7d6bcf93a16bac3f77baff333468c257e888d"
     },
     {
       "path": "l10n/zh_CN.po",
-      "sha256": "d2b15f76ea0cdde74e17faead01ab061c45c578db983ab96d3c2a5f795648052"
+      "sha256": "03ed163f6fedb0cdad5f63d0665bbeca01422221d2a52dc4d8b2732de16ccd19"
     },
     {
       "path": "README.md",

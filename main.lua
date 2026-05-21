@@ -1,4 +1,4 @@
-﻿local Device = require("device")
+local Device = require("device")
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
 local UIManager = require("ui/uimanager")
@@ -1255,7 +1255,7 @@ function AppStore:buildUpdateItems(summary)
             
             local version_line
             if remote_version_str then
-                version_line = string.format(_("Local: %s → Remote: %s"), local_version_str, remote_version_str)
+                version_line = string.format(_("Local: %s -> Remote: %s"), local_version_str, remote_version_str)
             else
                 version_line = string.format(_("Local: %s"), local_version_str)
             end
@@ -1316,7 +1316,7 @@ function AppStore:buildUpdateBrowserItems(summary)
     local items = {}
 
     items[#items + 1] = {
-        text = "⮤ " .. _("Switch to plugin list"),
+        text = "< " .. _("Switch to plugin list"),
         keep_menu_open = true,
         callback = function()
             self:closeUpdatesDialog(true)
@@ -1373,7 +1373,7 @@ function AppStore:buildPatchUpdateBrowserItems(summary)
     local items = {}
 
     items[#items + 1] = {
-        text ="⮤ " .. _("Switch to patch list"),
+        text ="< " .. _("Switch to patch list"),
         keep_menu_open = true,
         callback = function()
             self:closePatchUpdatesDialog(true)
@@ -4845,7 +4845,7 @@ end
 local SORT_OPTIONS = {
     {
         id = "stars_desc",
-        summary = _("Sort: Stars (high → low)"),
+        summary = _("Sort: Stars (high -> low)"),
         repo_comparator = compareRepoStarsDesc,
         patch_comparator = comparePatchStarsDesc,
     },
@@ -4857,7 +4857,7 @@ local SORT_OPTIONS = {
     },
     {
         id = "name_asc",
-        summary = _("Sort: Name (A → Z)"),
+        summary = _("Sort: Name (A -> Z)"),
         repo_comparator = compareRepoNameAsc,
         patch_comparator = comparePatchNameAsc,
     },
@@ -7070,7 +7070,7 @@ local function splitReadmePages(text, max_len)
                 cut = i
                 break
             end
-            if ch == "." or ch == "!" or ch == "?" or ch == "。" or ch == "！" or ch == "？" then
+            if ch == "." or ch == "!" or ch == "?" or ch == "\227\128\130" or ch == "\239\188\129" or ch == "\239\188\159" then
                 cut = i
                 break
             end
@@ -7357,8 +7357,8 @@ end
 --      fork. `include_zero_star_forks` controls whether 0-star forks are
 --      requested at all (they are filtered server-side, never client-side).
 --   2. Read `total_count` from the first real page (no dedicated probe) and:
---        - if total_count < 1000 → paginate the branch normally;
---        - if total_count >= 1000 → fall back to the legacy star split for
+--        - if total_count < 1000 -> paginate the branch normally;
+--        - if total_count >= 1000 -> fall back to the legacy star split for
 --          that one branch, and then exhaustiveSearch handles any sub-query
 --          that still overflows by bisecting on created:date.
 local SEARCH_RESULT_LIMIT = 1000
@@ -7414,7 +7414,7 @@ local function buildRateLimitMessage()
     if GitHub.hasAuthToken() then
         return _("GitHub API rate limit exceeded. Please wait a few minutes and try again.")
     end
-    return _("GitHub API rate limit exceeded. Add a GitHub token in AppStore settings to increase the limit (10→30 req/min).")
+    return _("GitHub API rate limit exceeded. Add a GitHub token in AppStore settings to increase the limit (10->30 req/min).")
 end
 
 -- Issue one Search API call for `query` at the given page. Returns

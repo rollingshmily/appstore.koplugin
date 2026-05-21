@@ -1,4 +1,4 @@
-﻿local DataStorage = require("datastorage")
+local DataStorage = require("datastorage")
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
 local _ = require("appstore_gettext")

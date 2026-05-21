@@ -1,4 +1,4 @@
-﻿local http = require("socket.http")
+local http = require("socket.http")
 local json = require("json")
 local url = require("socket.url")
 local logger = require("logger")
