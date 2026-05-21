@@ -22,12 +22,40 @@ Discover, install, and update community-created KOReader plugins and user patche
 
 ## Quick Setup for China/Mainland Users
 
-1. Copy `appstore_configuration.sample.lua` to `appstore_configuration.lua` in the same directory.
-2. Edit `appstore_configuration.lua` and set:
+**Zero config needed!** The plugin comes with GitHub proxy (`gh-proxy.com`) enabled by default. Just:
+
+1. Download the `appstore.koplugin` folder
+2. Copy to your KOReader's `plugins` directory
+3. Restart KOReader
+
+All GitHub requests will automatically go through the proxy. No registration, no API keys required.
+
+### Optional: GitHub Token
+
+Without a token, you get ~10 API requests/minute (shared across all users). If you hit rate limits, you can add a GitHub Personal Access Token:
+
+1. Copy `appstore_configuration.sample.lua` to `appstore_configuration.lua`
+2. Edit and set your token:
    ```lua
-   proxy_url = "https://gh-proxy.com"
+   auth = {
+       github = {
+           token = "your_github_token_here",
+       },
+   },
    ```
-3. Restart KOReader. All GitHub requests will now go through the proxy.
+
+This raises the limit to 30 requests/minute. But most users won't need this.
+
+### Disable Proxy
+
+If you don't need the proxy (e.g., you have direct GitHub access):
+
+1. Create `appstore_configuration.lua` with:
+   ```lua
+   return {
+       proxy_url = "",
+   }
+   ```
 
 ## Key Capabilities
 

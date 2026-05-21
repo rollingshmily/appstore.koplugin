@@ -16,9 +16,15 @@ end
 
 local RepoContent = {}
 
+local DEFAULT_PROXY = "https://gh-proxy.com"
+
 local function proxyUrl(raw_url)
-    if AppStoreConfig.proxy_url and AppStoreConfig.proxy_url ~= "" then
-        return AppStoreConfig.proxy_url .. "/" .. raw_url
+    local proxy = AppStoreConfig.proxy_url
+    if proxy == nil then
+        proxy = DEFAULT_PROXY
+    end
+    if proxy and proxy ~= "" then
+        return proxy .. "/" .. raw_url
     end
     return raw_url
 end

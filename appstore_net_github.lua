@@ -13,10 +13,18 @@ local GitHubClient = {}
 local RAW_BASE_URL = "https://api.github.com"
 local USER_AGENT = "KOReader-AppStore"
 
+--- Default proxy for users in regions with restricted GitHub access.
+local DEFAULT_PROXY = "https://gh-proxy.com"
+
 --- Wrap a URL with the configured proxy prefix when proxy_url is set.
 function GitHubClient.proxyUrl(raw_url)
-    if AppStoreConfig.proxy_url and AppStoreConfig.proxy_url ~= "" then
-        return AppStoreConfig.proxy_url .. "/" .. raw_url
+    local proxy = AppStoreConfig.proxy_url
+    -- Use default proxy if not explicitly set to empty string
+    if proxy == nil then
+        proxy = DEFAULT_PROXY
+    end
+    if proxy and proxy ~= "" then
+        return proxy .. "/" .. raw_url
     end
     return raw_url
 end

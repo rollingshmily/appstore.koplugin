@@ -5,12 +5,12 @@ return {
     auth = {
         github = {
             type = "github",
-            token = "your_github_token",
+            token = "",
         },
     },
     -- GitHub proxy for users in regions with restricted access to GitHub.
-    -- Leave empty or nil to connect directly.
-    -- Example: "https://gh-proxy.com"
-    proxy_url = "",
+    -- Default: gh-proxy.com (no registration required).
+    -- Set to empty string "" to connect directly.
+    proxy_url = "https://gh-proxy.com",
 }
 
