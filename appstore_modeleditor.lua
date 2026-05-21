@@ -4,10 +4,6 @@ local InfoMessage = require("ui/widget/infomessage")
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local Blitbuffer = require("ffi/blitbuffer")
-local http = require("socket.http")
-local https = require("ssl.https")
-local ltn12 = require("ltn12")
-local json = require("json")
 local util = require("util")
 
 local _ = require("appstore_gettext")
@@ -114,10 +110,14 @@ function M.getSelectedModel(appstore)
     end
 end
 
-local function saveModel(appstore, key, cfg)
+local function saveModel(appstore, key, cfg, select_model)
     local models = getModels(appstore)
     models[key] = cfg
-    saveModels(appstore, models)
+    appstore.settings:saveSetting(M.SETTINGS_KEY, models)
+    if select_model then
+        appstore.settings:saveSetting(M.SELECTED_KEY, key)
+    end
+    appstore.settings:flush()
 end
 
 local function deleteModel(appstore, key)
@@ -162,59 +162,18 @@ local function fieldsToConfig(fields)
     }
 end
 
-local function requestJson(url, headers, body)
-    local response = {}
-    headers = headers or {}
-    headers["Content-Type"] = headers["Content-Type"] or "application/json"
-    headers["Accept"] = headers["Accept"] or "application/json"
-    headers["Content-Length"] = tostring(#body)
-    local request_fn = url:lower():match("^https://") and https.request or http.request
-    local _, code = request_fn{
-        url = url,
-        method = "POST",
-        headers = headers,
-        source = ltn12.source.string(body),
-        sink = ltn12.sink.table(response),
-    }
-    code = tonumber(code)
-    local response_body = table.concat(response)
-    if code ~= 200 then
-        return nil, string.format("HTTP %s: %s", tostring(code), response_body:sub(1, 300))
-    end
-    local ok, parsed = pcall(json.decode, response_body)
-    if not ok or type(parsed) ~= "table" then
-        return nil, _("decode error")
-    end
-    return parsed
-end
-
 local function testModel(cfg)
+    local Translator = require("appstore_translator")
     local additional = cfg.additional_parameters or {}
-    local body = json.encode({
+    return Translator.testOpenAISettings({
+        provider = cfg.provider,
+        base_url = cfg.base_url,
+        api_key = cfg.api_key,
         model = cfg.model,
-        messages = {
-            { role = "user", content = "Reply with the single word: pong" },
-        },
         temperature = additional.temperature or 0.2,
-        max_tokens = 16,
-        stream = false,
+        max_tokens = additional.max_tokens or 8192,
+        extra_headers = cfg.extra_headers,
     })
-    local parsed, err = requestJson(cfg.base_url, {
-        ["Authorization"] = "Bearer " .. cfg.api_key,
-        ["HTTP-Referer"] = "https://github.com/rollingshmily/appstore.koplugin",
-        ["X-Title"] = "appstore.koplugin",
-        ["User-Agent"] = "KOReader-AppStore",
-    }, body)
-    if not parsed then
-        return false, err
-    end
-    local choices = parsed.choices
-    local content = choices and choices[1] and choices[1].message and choices[1].message.content
-    if not content or content == "" then
-        local msg = parsed.error and parsed.error.message
-        return false, msg or _("empty model response")
-    end
-    return true, content
 end
 
 local function showModelForm(appstore, template, existing_key, on_done)
@@ -301,9 +260,7 @@ local function showModelForm(appstore, template, existing_key, on_done)
                         if existing_key and existing_key ~= key then
                             deleteModel(appstore, existing_key)
                         end
-                        saveModel(appstore, key, fieldsToConfig(fields))
-                        appstore.settings:saveSetting(M.SELECTED_KEY, key)
-                        appstore.settings:flush()
+                        saveModel(appstore, key, fieldsToConfig(fields), true)
                         UIManager:close(dialog)
                         UIManager:show(InfoMessage:new{ text = string.format(_("Saved and selected '%s'."), key), timeout = 3 })
                         if on_done then on_done() end

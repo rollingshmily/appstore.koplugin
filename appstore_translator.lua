@@ -19,6 +19,11 @@ local Translator = {}
 local SETTINGS_PATH = DataStorage:getSettingsDir() .. "/appstore.lua"
 local AppStoreSettings = LuaSettings:open(SETTINGS_PATH)
 
+local function getSettings()
+    AppStoreSettings = LuaSettings:open(SETTINGS_PATH)
+    return AppStoreSettings
+end
+
 function Translator.setSettings(settings)
     AppStoreSettings = settings or AppStoreSettings
 end
@@ -125,10 +130,14 @@ local function requestJson(url, headers, body)
     return parsed
 end
 
-local function getOpenAISettings()
+local function getSelectedModel()
+    return ModelEditor.getSelectedModel({ settings = getSettings() })
+end
+
+function Translator.getOpenAISettings(selected)
     local cfg = AppStoreConfig.translator or {}
     local openai = cfg.openai_compatible or cfg.openai or {}
-    local selected = ModelEditor.getSelectedModel({ settings = AppStoreSettings }) or {}
+    selected = selected or getSelectedModel() or {}
     local additional = selected.additional_parameters or openai.additional_parameters or {}
     return {
         provider = selected.provider or openai.provider or "openai_compatible",
@@ -141,8 +150,8 @@ local function getOpenAISettings()
     }
 end
 
-local function translateOpenAIChunk(text, source_lang, target_lang)
-    local settings = getOpenAISettings()
+local function translateOpenAIChunk(text, source_lang, target_lang, settings)
+    settings = settings or Translator.getOpenAISettings()
     if not settings.api_key or settings.api_key == "" then
         return nil, "OpenAI-compatible translator is not configured. Add and select a model in App Store > Custom Models."
     end
@@ -212,8 +221,7 @@ local function translateMyMemoryChunk(text, source_lang, target_lang)
     return translated
 end
 
-local function getProvider()
-    local selected = ModelEditor.getSelectedModel({ settings = AppStoreSettings })
+local function getProvider(selected)
     if selected and selected.api_key and selected.api_key ~= "" then
         return selected.provider or "openai_compatible"
     end
@@ -221,9 +229,9 @@ local function getProvider()
     return cfg.provider or "openai_compatible"
 end
 
-local function getCacheProviderKey(provider)
+local function getCacheProviderKey(provider, settings)
     if provider ~= "mymemory" then
-        local settings = getOpenAISettings()
+        settings = settings or Translator.getOpenAISettings()
         return table.concat({
             tostring(provider or "openai_compatible"),
             tostring(settings.base_url or ""),
@@ -235,13 +243,28 @@ local function getCacheProviderKey(provider)
     return provider
 end
 
+function Translator.testOpenAISettings(settings)
+    settings = settings or Translator.getOpenAISettings()
+    return translateOpenAIChunk("Reply with the single word: pong", "en", "English", {
+        provider = settings.provider,
+        base_url = settings.base_url,
+        api_key = settings.api_key,
+        model = settings.model,
+        temperature = settings.temperature,
+        max_tokens = 16,
+        extra_headers = settings.extra_headers,
+    })
+end
+
 function Translator.translate(text, source_lang, target_lang)
     if not text or text == "" then
         return ""
     end
 
-    local provider = getProvider()
-    local cache_provider = getCacheProviderKey(provider)
+    local selected = getSelectedModel()
+    local provider = getProvider(selected)
+    local settings = provider ~= "mymemory" and Translator.getOpenAISettings(selected) or nil
+    local cache_provider = getCacheProviderKey(provider, settings)
     local cached = readCache(text, cache_provider)
     if cached then
         return cached
@@ -259,7 +282,7 @@ function Translator.translate(text, source_lang, target_lang)
         if provider == "mymemory" then
             result, err = translateMyMemoryChunk(chunk, source_lang, "zh-CN")
         else
-            result, err = translateOpenAIChunk(chunk, source_lang, target_lang)
+            result, err = translateOpenAIChunk(chunk, source_lang, target_lang, settings)
         end
         if not result then
             logger.warn("AppStore translator chunk failed", provider, i, err)
