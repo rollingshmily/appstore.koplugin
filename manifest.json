@@ -1,13 +1,13 @@
 {
-  "version": "1.9.3",
+  "version": "1.9.4",
   "files": [
     {
       "path": "_meta.lua",
-      "sha256": "7f826ca185caac6e7bb7f629bffd287b82679546fa78e71be14fe326d5175bc4"
+      "sha256": "350dcca125937649e7c927363c9d3add9296562b770b244c8fee08ead69fd38d"
     },
     {
       "path": "main.lua",
-      "sha256": "3d76fc6801921459015ddf072a96faecfae86f0ddd953135764f7874faf7ac98"
+      "sha256": "9f96159fb60041f6fcd090c910ac7cb7fa5d3daaa57d0a976f209c3943b1c8f5"
     },
     {
       "path": "appstore_cache.lua",
@@ -26,6 +26,10 @@
       "sha256": "296aaa1fa0ab6734e9a6c329de364c8458fc10fb287d5810024018f4025cc4ff"
     },
     {
+      "path": "appstore_modeleditor.lua",
+      "sha256": "1d14e3e382ed0eff755b1e47f449474283ee28f5d07617257479e4f3918d9c9a"
+    },
+    {
       "path": "appstore_net_github.lua",
       "sha256": "7f5fed77e45dee9a229442fb49ef854102b0217669a9da954526bee15dba1ac2"
     },
@@ -35,7 +39,7 @@
     },
     {
       "path": "appstore_translator.lua",
-      "sha256": "e2f4b7bd3f1c884d5d9cf59afb1657bf842516a483b35cab74eef31665b18a25"
+      "sha256": "027fc2d5839a5c94c7265ffc16c5d140a7adca364ab51ceb87a6b2b6029eeb1c"
     },
     {
       "path": "appstore_updates.lua",

@@ -6,6 +6,7 @@ local logger = require("logger")
 local DataStorage = require("datastorage")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
+local ModelEditor = require("appstore_modeleditor")
 local LuaSettings = require("luasettings")
 
 local ok_cfg, AppStoreConfig = pcall(require, "appstore_configuration")
@@ -17,7 +18,6 @@ local Translator = {}
 
 local SETTINGS_PATH = DataStorage:getSettingsDir() .. "/appstore.lua"
 local AppStoreSettings = LuaSettings:open(SETTINGS_PATH)
-local TRANSLATOR_SETTINGS_KEY = "translator_provider_settings"
 
 local CACHE_DIR = DataStorage:getDataDir() .. "/cache/appstore/translations"
 local MYMEMORY_API_URL = "https://api.mymemory.translated.net/get"
@@ -96,9 +96,6 @@ local function splitIntoChunks(text, max_len)
 end
 
 local function requestJson(url, headers, body)
-    if url:lower():match("^https://") then
-        https.cert_verify = false
-    end
     local response = {}
     headers = headers or {}
     headers["Content-Type"] = headers["Content-Type"] or "application/json"
@@ -127,16 +124,16 @@ end
 local function getOpenAISettings()
     local cfg = AppStoreConfig.translator or {}
     local openai = cfg.openai_compatible or cfg.openai or {}
-    local saved = AppStoreSettings:readSetting(TRANSLATOR_SETTINGS_KEY) or {}
-    local additional = saved.additional_parameters or openai.additional_parameters or {}
+    local selected = ModelEditor.getSelectedModel({ settings = AppStoreSettings }) or {}
+    local additional = selected.additional_parameters or openai.additional_parameters or {}
     return {
-        provider = saved.provider or openai.provider or "openai_compatible",
-        base_url = saved.base_url or openai.base_url or "https://openrouter.ai/api/v1/chat/completions",
-        api_key = saved.api_key or openai.api_key or "",
-        model = saved.model or openai.model or "qwen/qwen3-14b:free",
+        provider = selected.provider or openai.provider or "openai_compatible",
+        base_url = selected.base_url or openai.base_url or "https://openrouter.ai/api/v1/chat/completions",
+        api_key = selected.api_key or openai.api_key or "",
+        model = selected.model or openai.model or "qwen/qwen3-14b:free",
         max_tokens = additional.max_tokens or openai.max_tokens or 8192,
         temperature = additional.temperature or openai.temperature or 0.2,
-        extra_headers = saved.extra_headers or openai.extra_headers or {},
+        extra_headers = selected.extra_headers or openai.extra_headers or {},
     }
 end
 
@@ -212,9 +209,9 @@ local function translateMyMemoryChunk(text, source_lang, target_lang)
 end
 
 local function getProvider()
-    local saved = AppStoreSettings:readSetting(TRANSLATOR_SETTINGS_KEY) or {}
-    if saved.api_key and saved.api_key ~= "" then
-        return saved.provider or "openai_compatible"
+    local selected = ModelEditor.getSelectedModel({ settings = AppStoreSettings })
+    if selected and selected.api_key and selected.api_key ~= "" then
+        return selected.provider or "openai_compatible"
     end
     local cfg = AppStoreConfig.translator or {}
     return cfg.provider or "openai_compatible"

@@ -39,6 +39,7 @@ local GitHub = require("appstore_net_github")
 local RepoContent = require("appstore_repo_content")
 local InstallStore = require("appstore_installs")
 local Translator = require("appstore_translator")
+local ModelEditor = require("appstore_modeleditor")
 local util = require("util")
 local NetworkMgr = require("ui/network/manager")
 local socketutil = require("socketutil")
@@ -69,7 +70,6 @@ local PLUGIN_NAME_QUERIES = { 'in:name ".koplugin"' }
 local PATCH_NAME_QUERIES = { 'in:name "KOReader.patches"' }
 local BROWSER_STATE_KEY = "browser_state"
 local INCLUDE_ZERO_STAR_FORKS_KEY = "include_zero_star_forks"
-local TRANSLATOR_SETTINGS_KEY = "translator_provider_settings"
 local PATCH_CACHE_TTL = 10 * 60
 local DEFAULT_SORT_MODE = "stars_desc"
 
@@ -5925,92 +5925,6 @@ function AppStore:showFilterDialog()
     dialog:onShowKeyboard()
 end
 
-function AppStore:showTranslatorSettingsDialog()
-    local cfg = AppStoreSettings:readSetting(TRANSLATOR_SETTINGS_KEY) or {}
-    local additional = cfg.additional_parameters or {}
-    local dialog
-    dialog = MultiInputDialog:new{
-        title = _("README translation model"),
-        fields = {
-            {
-                description = _("Provider name"),
-                text = cfg.provider or "openrouter",
-                hint = _("e.g., openrouter"),
-            },
-            {
-                description = _("Model"),
-                text = cfg.model or "qwen/qwen3-14b:free",
-                hint = _("e.g., qwen/qwen3-14b:free"),
-            },
-            {
-                description = _("Base URL"),
-                text = cfg.base_url or "https://openrouter.ai/api/v1/chat/completions",
-                hint = "https://openrouter.ai/api/v1/chat/completions",
-            },
-            {
-                description = _("API key"),
-                text = cfg.api_key or "",
-                hint = _("Bearer token for the provider"),
-            },
-            {
-                description = _("Max tokens"),
-                input_type = "number",
-                text = tostring(additional.max_tokens or 8192),
-                hint = "8192",
-            },
-            {
-                description = _("Temperature"),
-                text = tostring(additional.temperature or 0.2),
-                hint = "0.2",
-            },
-        },
-        buttons = {
-            {
-                {
-                    text = _("Cancel"),
-                    background = Blitbuffer.COLOR_WHITE,
-                    callback = function()
-                        UIManager:close(dialog)
-                    end,
-                },
-                {
-                    text = _("Reset"),
-                    background = Blitbuffer.COLOR_WHITE,
-                    callback = function()
-                        AppStoreSettings:delSetting(TRANSLATOR_SETTINGS_KEY)
-                        AppStoreSettings:flush()
-                        UIManager:close(dialog)
-                        UIManager:show(InfoMessage:new{ text = _("Translation model reset."), timeout = 3 })
-                    end,
-                },
-                {
-                    text = _("Save"),
-                    background = Blitbuffer.COLOR_WHITE,
-                    is_enter_default = true,
-                    callback = function()
-                        local fields = dialog:getFields()
-                        AppStoreSettings:saveSetting(TRANSLATOR_SETTINGS_KEY, {
-                            provider = util.trim(fields[1] or ""),
-                            model = util.trim(fields[2] or ""),
-                            base_url = util.trim(fields[3] or ""),
-                            api_key = util.trim(fields[4] or ""),
-                            additional_parameters = {
-                                max_tokens = tonumber(fields[5]) or 8192,
-                                temperature = tonumber(fields[6]) or 0.2,
-                            },
-                        })
-                        AppStoreSettings:flush()
-                        UIManager:close(dialog)
-                        UIManager:show(InfoMessage:new{ text = _("Translation model saved."), timeout = 3 })
-                    end,
-                },
-            },
-        },
-    }
-    UIManager:show(dialog)
-    dialog:onShowKeyboard()
-end
-
 function AppStore:showAppStoreSettingsDialog()
     -- Opened via the gear icon on the browser title bar.
     -- Keep the toggle list minimal; additional settings can be added below as
@@ -6021,16 +5935,6 @@ function AppStore:showAppStoreSettingsDialog()
     local current_kind = (self.browser_state and self.browser_state.kind) or "plugin"
     local dialog
     local buttons = {
-        {
-            {
-                text = _("README translation model"),
-                background = Blitbuffer.COLOR_WHITE,
-                callback = function()
-                    UIManager:close(dialog)
-                    self:showTranslatorSettingsDialog()
-                end,
-            },
-        },
         {
             {
                 text = string.format("%s  %s", mark, _("Include 0-star forks")),
@@ -7741,6 +7645,7 @@ end
 
 function AppStore:init()
     self.cache_dir = ensureCacheDir()
+    self.settings = AppStoreSettings
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
 end
@@ -7761,6 +7666,14 @@ function AppStore:addToMainMenu(menu_items)
                 callback = function()
                     self:checkSelfUpdate()
                 end,
+            },
+            {
+                text = _("Custom Models"),
+                help_text = _("Add and choose OpenAI-compatible models for README translation."),
+                sub_item_table_func = function()
+                    return ModelEditor.genCustomModelsSubMenu(self)
+                end,
+                keep_menu_open = true,
             },
             {
                 text = _("AppStore settings"),
