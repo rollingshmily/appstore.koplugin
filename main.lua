@@ -7117,7 +7117,11 @@ end
 
 local AppStoreReadmeDialog = FocusManager:extend{
     appstore = nil,
+    repo = nil,
     title = nil,
+    original_text = nil,
+    translated_text = nil,
+    mode = "original",
     pages = nil,
     page = 1,
 }
@@ -7145,6 +7149,10 @@ function AppStoreReadmeDialog:init()
         title = page_title,
         fullscreen = false,
         with_bottom_line = true,
+        left_icon = "appbar.menu",
+        left_icon_tap_callback = function()
+            self:showReadmeActions()
+        end,
         close_callback = function()
             UIManager:close(self)
         end,
@@ -7208,13 +7216,7 @@ function AppStoreReadmeDialog:showPage(delta)
     if next_page == self.page then
         return true
     end
-    UIManager:close(self)
-    UIManager:show(AppStoreReadmeDialog:new{
-        appstore = self.appstore,
-        title = self.title,
-        pages = self.pages,
-        page = next_page,
-    })
+    self:replaceContent(self.mode, next_page)
     return true
 end
 
@@ -7236,16 +7238,79 @@ function AppStoreReadmeDialog:onRight()
     return self:showPage(1)
 end
 
-function AppStore:showReadmeDialog(title, text)
+function AppStoreReadmeDialog:replaceContent(mode, page)
+    local source = mode == "translated" and self.translated_text or self.original_text
+    self.mode = mode or "original"
+    self.pages = splitReadmePages(formatReadmeForTextBox(source or ""), 6000)
+    self.page = math.max(1, math.min(page or 1, #(self.pages or {})))
+    UIManager:close(self)
+    UIManager:show(AppStoreReadmeDialog:new{
+        appstore = self.appstore,
+        repo = self.repo,
+        title = self.title,
+        original_text = self.original_text,
+        translated_text = self.translated_text,
+        mode = self.mode,
+        pages = self.pages,
+        page = self.page,
+    })
+    return true
+end
+
+function AppStoreReadmeDialog:showReadmeActions()
+    local buttons = {}
+    if self.mode == "translated" then
+        table.insert(buttons, {
+            {
+                text = _("View original"),
+                callback = function()
+                    if self.actions_dialog then UIManager:close(self.actions_dialog) end
+                    self:replaceContent("original", 1)
+                end,
+            },
+        })
+    else
+        table.insert(buttons, {
+            {
+                text = self.translated_text and _("View translation") or _("Translate to Chinese"),
+                callback = function()
+                    if self.actions_dialog then UIManager:close(self.actions_dialog) end
+                    if self.translated_text then
+                        self:replaceContent("translated", 1)
+                    elseif self.appstore then
+                        self.appstore:translateReadmeInDialog(self)
+                    end
+                end,
+            },
+        })
+    end
+    table.insert(buttons, {
+        {
+            text = _("Close"),
+            callback = function()
+                if self.actions_dialog then UIManager:close(self.actions_dialog) end
+            end,
+        },
+    })
+    self.actions_dialog = ButtonDialog:new{
+        title = _("README"),
+        buttons = buttons,
+    }
+    UIManager:show(self.actions_dialog)
+end
+
+function AppStore:showReadmeDialog(title, text, repo)
     if not text or text == "" then
         UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
         return
     end
-    local formatted = formatReadmeForTextBox(text)
-    local pages = splitReadmePages(formatted, 6000)
+    local pages = splitReadmePages(formatReadmeForTextBox(text), 6000)
     UIManager:show(AppStoreReadmeDialog:new{
         appstore = self,
+        repo = repo,
         title = title or _("README"),
+        original_text = text,
+        mode = "original",
         pages = pages,
         page = 1,
     })
@@ -7255,61 +7320,17 @@ function AppStore:openReadmeInDialog(repo, text)
     local owner = repo and (repo.owner or (repo.data and repo.data.owner and repo.data.owner.login))
     local repo_name = repo and repo.name
     local title = (owner and repo_name) and string.format("%s/%s · README", owner, repo_name) or _("README")
-    self:showReadmeDialog(title, text)
+    self:showReadmeDialog(title, text, repo)
 end
 
 function AppStore:showReadmeWithTranslation(text, repo)
-    if not text or text == "" then
-        UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
-        return
-    end
-
-    if not Translator.needsTranslation(text) then
-        self:openReadmeInDialog(repo, text)
-        return
-    end
-
-    local dialog
-    local buttons = {
-        {
-            {
-                text = _("View original"),
-                background = Blitbuffer.COLOR_WHITE,
-                callback = function()
-                    UIManager:close(dialog)
-                    self:openReadmeInDialog(repo, text)
-                end,
-            },
-        },
-        {
-            {
-                text = _("Translate to Chinese"),
-                background = Blitbuffer.COLOR_WHITE,
-                callback = function()
-                    UIManager:close(dialog)
-                    self:translateAndShowReadme(text, repo)
-                end,
-            },
-        },
-        {
-            {
-                text = _("Cancel"),
-                background = Blitbuffer.COLOR_WHITE,
-                callback = function()
-                    UIManager:close(dialog)
-                end,
-            },
-        },
-    }
-
-    dialog = ButtonDialog:new{
-        title = _("README detected as English. What would you like to do?"),
-        buttons = buttons,
-    }
-    UIManager:show(dialog)
+    self:openReadmeInDialog(repo, text)
 end
 
-function AppStore:translateAndShowReadme(text, repo)
+function AppStore:translateReadmeInDialog(readme_dialog)
+    if not readme_dialog or not readme_dialog.original_text then
+        return
+    end
     local Trapper = require("ui/trapper")
     local progress = InfoMessage:new{
         text = _("Translating…"),
@@ -7319,24 +7340,21 @@ function AppStore:translateAndShowReadme(text, repo)
     UIManager:show(progress)
     UIManager:forceRePaint()
 
+    local original_text = readme_dialog.original_text
     local completed, translated = Trapper:dismissableRunInSubprocess(function()
         local TranslatorWorker = require("appstore_translator")
-        return TranslatorWorker.translate(text, "en", "zh-CN")
+        return TranslatorWorker.translate(original_text, "en", "zh-CN")
     end, progress)
 
     UIManager:close(progress)
     logger.dbg("AppStore README translation result", completed, translated and #translated or 0)
-    if completed and translated and translated ~= "" and translated ~= text then
-        self:showTranslatedReadme(translated, repo)
+    if completed and translated and translated ~= "" and translated ~= original_text then
+        readme_dialog.translated_text = translated
+        readme_dialog:replaceContent("translated", 1)
         return
     end
 
-    UIManager:show(InfoMessage:new{ text = _("Translation failed. Showing original."), timeout = 4 })
-    self:openReadmeInDialog(repo, text)
-end
-
-function AppStore:showTranslatedReadme(translatedText, repo)
-    self:openReadmeInDialog(repo, translatedText)
+    UIManager:show(InfoMessage:new{ text = _("Translation failed."), timeout = 4 })
 end
 
 local function appendUniqueRepo(target, seen, repo)
