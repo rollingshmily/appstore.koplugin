@@ -3486,6 +3486,26 @@ function AppStoreListItem:init()
             }
         end
 
+        self.ges_events = {
+            AppStoreTap = {
+                GestureRange:new{
+                    ges = "tap",
+                    range = tap_range,
+                },
+            },
+        }
+        if entry.hold_callback then
+            self.ges_events.AppStoreHold = {
+                GestureRange:new{
+                    ges = "hold",
+                    range = tap_range,
+                },
+            }
+        end
+    end
+end
+
+
 function AppStore:promptPatchAction(repo, patch)
     local repo_title = repo.full_name or repo.name or _("Repository")
     local details = {
@@ -3616,25 +3636,6 @@ function AppStore:_installPatchFromRepoInternal(repo, patch)
         self:updateSinglePatchStatus(patch.filename, stored_record)
     end
 end
-        self.ges_events = {
-            AppStoreTap = {
-                GestureRange:new{
-                    ges = "tap",
-                    range = tap_range,
-                },
-            },
-        }
-        if entry.hold_callback then
-            self.ges_events.AppStoreHold = {
-                GestureRange:new{
-                    ges = "hold",
-                    range = tap_range,
-                },
-            }
-        end
-    end
-end
-
 function AppStoreListItem:onAppStoreTap()
     if self.dialog then
         self.dialog:onEntryActivated(self.entry)
@@ -7176,6 +7177,8 @@ function AppStoreReadmeDialog:init()
     self[1] = FrameContainer:new{
         background = Blitbuffer.COLOR_WHITE,
         bordersize = 0,
+        padding = 0,
+        dimen = self.dimen:copy(),
         VerticalGroup:new{
             self.title_bar,
             CenterContainer:new{
