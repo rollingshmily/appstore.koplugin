@@ -38,6 +38,7 @@ local Cache = require("appstore_cache")
 local GitHub = require("appstore_net_github")
 local RepoContent = require("appstore_repo_content")
 local InstallStore = require("appstore_installs")
+local Translator = require("appstore_translator")
 local util = require("util")
 local NetworkMgr = require("ui/network/manager")
 local socketutil = require("socketutil")
@@ -7028,8 +7029,100 @@ function AppStore:showReadme(repo)
             return
         end
         self:closeBrowserMenu()
-        RepoContent.openReadme(path_or_err)
+        -- Show translation options
+        self:showReadmeWithTranslation(path_or_err, repo)
     end)
+end
+
+function AppStore:showReadmeWithTranslation(path, repo)
+    -- Read the file to check if translation is needed
+    local text, err = util.readFromFile(path)
+    if not text or text == "" then
+        RepoContent.openReadme(path)
+        return
+    end
+
+    -- Check if text needs translation
+    if not Translator.needsTranslation(text) then
+        -- Already Chinese, open directly
+        RepoContent.openReadme(path)
+        return
+    end
+
+    -- Show options dialog
+    local buttons = {
+        {
+            text = _("View original"),
+            callback = function()
+                UIManager:close(self.readme_dialog)
+                RepoContent.openReadme(path)
+            end,
+        },
+        {
+            text = _("Translate to Chinese"),
+            callback = function()
+                UIManager:close(self.readme_dialog)
+                self:translateAndShowReadme(path, text, repo)
+            end,
+        },
+    }
+
+    self.readme_dialog = ButtonDialog:new{
+        title = _("README detected as English. What would you like to do?"),
+        buttons = buttons,
+    }
+    UIManager:show(self.readme_dialog)
+end
+
+function AppStore:translateAndShowReadme(path, text, repo)
+    local progress = InfoMessage:new{ text = _("Translating…"), timeout = 0 }
+    UIManager:show(progress)
+    UIManager:forceRePaint()
+
+    -- Translate in a coroutine to avoid blocking UI
+    local co = coroutine.create(function()
+        return Translator.translate(text, "en", "zh-CN")
+    end)
+
+    local function checkTranslation()
+        local ok, result = coroutine.resume(co)
+        if coroutine.status(co) == "dead" then
+            UIManager:close(progress)
+            if ok and result and result ~= "" then
+                -- Show translated version
+                self:showTranslatedReadme(result, repo)
+            else
+                -- Fallback to original
+                UIManager:show(InfoMessage:new{ text = _("Translation failed. Showing original."), timeout = 4 })
+                RepoContent.openReadme(path)
+            end
+        else
+            -- Still running, check again later
+            UIManager:scheduleIn(100, checkTranslation)
+        end
+    end
+
+    -- Start checking
+    UIManager:scheduleIn(100, checkTranslation)
+end
+
+function AppStore:showTranslatedReadme(translatedText, repo)
+    -- Create a temporary file with translated content
+    local DataStorage = require("datastorage")
+    local cache_dir = DataStorage:getDataDir() .. "/cache/appstore/readme"
+    util.makePath(cache_dir)
+
+    local safe_owner = (repo.owner or "unknown"):gsub("[^%w_-]", "_")
+    local safe_repo = (repo.name or "unknown"):gsub("[^%w_-]", "_")
+    local path = string.format("%s/%s_%s_README_zh.md", cache_dir, safe_owner, safe_repo)
+
+    local ok, err = util.writeToFile(translatedText, path)
+    if not ok then
+        UIManager:show(InfoMessage:new{ text = _("Failed to save translation."), timeout = 4 })
+        return
+    end
+
+    RepoContent.openReadme(path)
 end
 
 local function appendUniqueRepo(target, seen, repo)

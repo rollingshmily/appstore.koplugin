@@ -831,3 +831,27 @@ msgstr "查看 README"
 msgid "View release notes"
 msgstr "查看版本说明"
 
+
+msgid "View original"
+msgstr "查看原文"
+
+msgid "Translate to Chinese"
+msgstr "翻译为中文"
+
+msgid "README detected as English. What would you like to do?"
+msgstr "检测到 README 为英文，您想如何处理？"
+
+msgid "Translating…"
+msgstr "正在翻译…"
+
+msgid "Translation failed. Showing original."
+msgstr "翻译失败，显示原文。"
+
+msgid "Failed to save translation."
+msgstr "保存翻译失败。"
+
+msgid "Clear translation cache"
+msgstr "清除翻译缓存"
+
+msgid "Translation cache cleared."
+msgstr "翻译缓存已清除。"
