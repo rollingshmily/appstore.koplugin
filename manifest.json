@@ -1,0 +1,57 @@
+{
+  "version": "1.8.0",
+  "files": [
+    {
+      "path": "_meta.lua",
+      "sha256": "5c3954637951def451411fda64aa5c0660fb0c79bffe074ad20a981f95f09868"
+    },
+    {
+      "path": "main.lua",
+      "sha256": "b74f2b69fecb07002ff2ce94c911bf7c3040a46e6ae4b709349f516ba4eb22fc"
+    },
+    {
+      "path": "appstore_cache.lua",
+      "sha256": "ed15cea01ec46c2196b50f0a56f4e59887dfd8e932e5113dcde6c7037ac68f18"
+    },
+    {
+      "path": "appstore_configuration.sample.lua",
+      "sha256": "2d6cc1b1d33d6cecbb652dce3e3dd700a53924416a92573219553a49e107b488"
+    },
+    {
+      "path": "appstore_gettext.lua",
+      "sha256": "42980c74b059b3d249cba8a2c0b23eeb375bd74310cce917f4c7b970fa957ac5"
+    },
+    {
+      "path": "appstore_installs.lua",
+      "sha256": "296aaa1fa0ab6734e9a6c329de364c8458fc10fb287d5810024018f4025cc4ff"
+    },
+    {
+      "path": "appstore_net_github.lua",
+      "sha256": "7f5fed77e45dee9a229442fb49ef854102b0217669a9da954526bee15dba1ac2"
+    },
+    {
+      "path": "appstore_repo_content.lua",
+      "sha256": "40fa4af25a0dc86164b62e14d5dc7bdc34a7859d1c4ef371384b0d38b7be4fcf"
+    },
+    {
+      "path": "appstore_translator.lua",
+      "sha256": "b8ed511fa81014f029a6939e3608f002abbe3fa6da9fe6471ac79ab385d93e00"
+    },
+    {
+      "path": "appstore_updates.lua",
+      "sha256": "97ebcc15174c136f45a191aca766fab3871ac6c4331c252f04404d8a0eee670a"
+    },
+    {
+      "path": "l10n/zh_CN.po",
+      "sha256": "02ce18ad80cb8d19d0746e523e8bf4e7cef23208b0e220845cfb4909dc45dc83"
+    },
+    {
+      "path": "README.md",
+      "sha256": "9010cf50b789ff271933ceb219fda8a4b776841fa0101da41f34debca5d00199"
+    },
+    {
+      "path": "updater.lua",
+      "sha256": "5f505868e0a93eeb863cd8a0f66f7092150f62df2e7b29ab0cb9c3a7741ca1ba"
+    }
+  ]
+}

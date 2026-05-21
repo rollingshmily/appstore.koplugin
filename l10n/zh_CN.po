@@ -689,6 +689,18 @@ msgstr "检测到 README 为英文。你想怎么处理？"
 msgid "Updating from the latest main branch snapshot."
 msgstr "将从最新 main 分支快照更新。"
 
+msgid "Updating from the built-in update channel."
+msgstr "将从内置更新通道更新。"
+
+msgid "Downloading %d/%d: %s"
+msgstr "正在下载 %d/%d：%s"
+
+msgid "Install failed: "
+msgstr "安装失败："
+
+msgid "Updated to v%s. Restart KOReader to apply."
+msgstr "已更新到 v%s。请重启 KOReader 生效。"
+
 msgid "AppStore updated successfully! %d files extracted.\\nPlease restart KOReader."
 msgstr "应用商店更新成功！已解压 %d 个文件。请重启 KOReader。"
 

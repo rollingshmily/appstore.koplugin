@@ -51,6 +51,10 @@ local lfs = require("libs/libkoreader-lfs")
 local json = require("json")
 local logger = require("logger")
 
+local PLUGIN_DIR = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]+$")
+local Updater = dofile(PLUGIN_DIR .. "/updater.lua")
+local SELF_UPDATE_URL = "https://gh-proxy.com/https://raw.githubusercontent.com/rollingshmily/appstore.koplugin/main/manifest.json"
+
 local SETTINGS_PATH = DataStorage:getSettingsDir() .. "/appstore.lua"
 local AppStoreSettings = LuaSettings:open(SETTINGS_PATH)
 
@@ -7533,143 +7537,63 @@ function AppStore:checkSelfUpdate()
         end
     end
 
-    local progress = InfoMessage:new{ text = _("Checking for AppStore updates…"), timeout = 0 }
-    UIManager:show(progress)
-    UIManager:forceRePaint()
-
     NetworkMgr:runWhenOnline(function()
-        local body, err = fetchGitHubRaw("rollingshmily", "appstore.koplugin", "main", "_meta.lua")
-        UIManager:close(progress)
+        local Trapper = require("ui/trapper")
+        Trapper:wrap(function()
+            Trapper:info(_("Checking for AppStore updates…"))
+            local manifest, err = Updater.fetchManifest(SELF_UPDATE_URL)
+            Trapper:reset()
+            if not manifest then
+                UIManager:show(InfoMessage:new{
+                    text = _("Failed to check updates: ") .. tostring(err or "?"),
+                    timeout = 6,
+                })
+                return
+            end
 
-        if not body then
-            UIManager:show(InfoMessage:new{
-                text = _("Failed to check updates: ") .. formatGitHubError(err),
-                timeout = 6,
+            if Updater.compareVersions(current_version, manifest.version) >= 0 then
+                UIManager:show(InfoMessage:new{
+                    text = string.format(_("AppStore is up to date (v%s)."), current_version),
+                    timeout = 4,
+                })
+                return
+            end
+
+            UIManager:show(ConfirmBox:new{
+                text = string.format(_("AppStore update available!\n\nCurrent: v%s\nLatest: v%s\n\nRelease notes:\n%s"), current_version, manifest.version, _("Updating from the built-in update channel.")),
+                ok_text = _("Update now"),
+                ok_callback = function()
+                    self:installSelfUpdate(manifest)
+                end,
+                cancel_text = _("Later"),
             })
-            return
-        end
-
-        local remote_version = extractMetaField(body, "version")
-        if not remote_version then
-            UIManager:show(InfoMessage:new{
-                text = _("Failed to check updates: ") .. _("Remote version not found."),
-                timeout = 6,
-            })
-            return
-        end
-
-        if not isVersionNewer(remote_version, current_version) then
-            UIManager:show(InfoMessage:new{
-                text = string.format(_("AppStore is up to date (v%s)."), current_version),
-                timeout = 4,
-            })
-            return
-        end
-
-        local message = string.format(
-            _("AppStore update available!\n\nCurrent: v%s\nLatest: v%s\n\nRelease notes:\n%s"),
-            current_version,
-            remote_version,
-            _("Updating from the latest main branch snapshot.")
-        )
-
-        UIManager:show(ConfirmBox:new{
-            text = message,
-            ok_text = _("Update now"),
-            ok_callback = function()
-                self:downloadAndInstallUpdate(GitHub.proxyUrl("https://github.com/rollingshmily/appstore.koplugin/archive/refs/heads/main.zip"))
-            end,
-            cancel_text = _("Later"),
-        })
+        end)
     end)
 end
 
-function AppStore:downloadAndInstallUpdate(url)
-    local DataStorage = require("datastorage")
-    local cache_dir = DataStorage:getDataDir() .. "/cache/appstore/downloads"
-    util.makePath(cache_dir)
-    local zip_path = cache_dir .. "/appstore-update.zip"
-
-    local progress = InfoMessage:new{ text = _("Downloading AppStore update…"), timeout = 0 }
-    UIManager:show(progress)
-    UIManager:forceRePaint()
-
-    local ok, err = downloadToFile(url, zip_path)
-    UIManager:close(progress)
-
-    if not ok then
-        util.removeFile(zip_path)
-        UIManager:show(InfoMessage:new{
-            text = _("Download failed: ") .. tostring(err),
-            timeout = 6,
-        })
-        return
-    end
-
-    local plugins_dir = DataStorage:getDataDir() .. "/plugins"
-    local target_dir = plugins_dir .. "/appstore.koplugin"
-
-    local reader = Archiver.Reader:new()
-    if not reader:open(zip_path) then
-        util.removeFile(zip_path)
-        UIManager:show(InfoMessage:new{
-            text = _("Failed to open update archive."),
-            timeout = 6,
-        })
-        return
-    end
-
-    local root_prefix
-    for entry in reader:iterate() do
-        if entry.mode == "file" and entry.path:match("_meta%.lua$") then
-            root_prefix = entry.path:match("^([^/]+/)")
-            break
-        end
-    end
-    if reader.rewind then
-        reader:rewind()
-    else
-        reader:close()
-        reader = Archiver.Reader:new()
-        if not reader:open(zip_path) then
-            util.removeFile(zip_path)
-            UIManager:show(InfoMessage:new{ text = _("Failed to open update archive."), timeout = 6 })
-            return
-        end
-    end
-
-    local extracted = 0
-    for entry in reader:iterate() do
-        if entry.mode == "file" then
-            local relative = entry.path
-            if root_prefix then
-                relative = entry.path:sub(#root_prefix + 1)
+function AppStore:installSelfUpdate(manifest)
+    NetworkMgr:runWhenOnline(function()
+        local Trapper = require("ui/trapper")
+        Trapper:wrap(function()
+            local cb = function(i, n, name)
+                Trapper:info(string.format(_("Downloading %d/%d: %s"), i, n, name))
             end
-            if relative and relative ~= "" then
-                local target_path = target_dir .. "/" .. relative
-                local target_parent = target_path:match("^(.*)/")
-                if target_parent then
-                    util.makePath(target_parent)
-                end
-                local extract_ok = reader:extractToPath(entry.path, target_path)
-                if not extract_ok then
-                    reader:close()
-                    util.removeFile(zip_path)
-                    UIManager:show(InfoMessage:new{ text = _("Failed to extract file: ") .. entry.path, timeout = 6 })
-                    return
-                end
-                extracted = extracted + 1
+            local ok_call, ok, err = pcall(Updater.install, SELF_UPDATE_URL, manifest, PLUGIN_DIR, cb)
+            Trapper:reset()
+            if not ok_call then
+                UIManager:show(InfoMessage:new{ text = _("Install failed: ") .. tostring(ok), timeout = 6 })
+                return
             end
-        end
-    end
-
-    reader:close()
-    util.removeFile(zip_path)
-
-    UIManager:show(InfoMessage:new{
-        text = string.format(_("AppStore updated successfully! %d files extracted.\nPlease restart KOReader."), extracted),
-        timeout = 8,
-    })
+            if not ok then
+                UIManager:show(InfoMessage:new{ text = _("Install failed: ") .. tostring(err or "?"), timeout = 6 })
+                return
+            end
+            UIManager:show(InfoMessage:new{
+                text = string.format(_("Updated to v%s. Restart KOReader to apply."), manifest.version),
+                timeout = 8,
+            })
+        end)
+    end)
 end
 
 function AppStore:onDispatcherRegisterActions()
