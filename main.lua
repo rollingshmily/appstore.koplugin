@@ -7091,35 +7091,29 @@ function AppStore:showReadmeWithTranslation(path, repo)
 end
 
 function AppStore:translateAndShowReadme(path, text, repo)
-    local progress = InfoMessage:new{ text = _("Translating…"), timeout = 0 }
+    local Trapper = require("ui/trapper")
+    local progress = InfoMessage:new{
+        text = _("Translating…"),
+        timeout = 0,
+        dismissable = false,
+    }
     UIManager:show(progress)
     UIManager:forceRePaint()
 
-    -- Translate in a coroutine to avoid blocking UI
-    local co = coroutine.create(function()
-        return Translator.translate(text, "en", "zh-CN")
-    end)
+    local completed, translated = Trapper:dismissableRunInSubprocess(function()
+        local TranslatorWorker = require("appstore_translator")
+        return TranslatorWorker.translate(text, "en", "zh-CN")
+    end, progress)
 
-    local function checkTranslation()
-        local ok, result = coroutine.resume(co)
-        if coroutine.status(co) == "dead" then
-            UIManager:close(progress)
-            if ok and result and result ~= "" then
-                -- Show translated version
-                self:showTranslatedReadme(result, repo)
-            else
-                -- Fallback to original
-                UIManager:show(InfoMessage:new{ text = _("Translation failed. Showing original."), timeout = 4 })
-                RepoContent.openReadme(path)
-            end
-        else
-            -- Still running, check again later
-            UIManager:scheduleIn(100, checkTranslation)
-        end
+    UIManager:close(progress)
+    logger.dbg("AppStore README translation result", completed, translated and #translated or 0)
+    if completed and translated and translated ~= "" and translated ~= text then
+        self:showTranslatedReadme(translated, repo)
+        return
     end
 
-    -- Start checking
-    UIManager:scheduleIn(100, checkTranslation)
+    UIManager:show(InfoMessage:new{ text = _("Translation failed. Showing original."), timeout = 4 })
+    RepoContent.openReadme(path)
 end
 
 function AppStore:showTranslatedReadme(translatedText, repo)
