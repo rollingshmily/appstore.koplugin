@@ -19,6 +19,10 @@ local Translator = {}
 local SETTINGS_PATH = DataStorage:getSettingsDir() .. "/appstore.lua"
 local AppStoreSettings = LuaSettings:open(SETTINGS_PATH)
 
+function Translator.setSettings(settings)
+    AppStoreSettings = settings or AppStoreSettings
+end
+
 local CACHE_DIR = DataStorage:getDataDir() .. "/cache/appstore/translations"
 local MYMEMORY_API_URL = "https://api.mymemory.translated.net/get"
 local MYMEMORY_CHUNK_LEN = 500
@@ -140,7 +144,7 @@ end
 local function translateOpenAIChunk(text, source_lang, target_lang)
     local settings = getOpenAISettings()
     if not settings.api_key or settings.api_key == "" then
-        return nil, "OpenAI-compatible translator is not configured. Set translator.openai_compatible.api_key."
+        return nil, "OpenAI-compatible translator is not configured. Add and select a model in App Store > Custom Models."
     end
     local prompt = table.concat({
         "Translate the following README content to " .. (target_lang or "Simplified Chinese") .. ".",

@@ -7646,6 +7646,7 @@ end
 function AppStore:init()
     self.cache_dir = ensureCacheDir()
     self.settings = AppStoreSettings
+    Translator.setSettings(AppStoreSettings)
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
 end
