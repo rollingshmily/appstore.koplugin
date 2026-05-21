@@ -7523,10 +7523,6 @@ local function formatGitHubError(err)
 end
 
 function AppStore:checkSelfUpdate()
-    local SELF_OWNER = "rollingshmily"
-    local SELF_REPO = "appstore.koplugin"
-
-    -- Read current version from _meta.lua
     local current_version = "1.7.0"
     local meta_path = self.path and (self.path .. "/_meta.lua") or nil
     if meta_path then
@@ -7541,22 +7537,10 @@ function AppStore:checkSelfUpdate()
     UIManager:forceRePaint()
 
     NetworkMgr:runWhenOnline(function()
-        local release, err = GitHub.fetchLatestRelease(SELF_OWNER, SELF_REPO)
-        if not release and type(err) == "table" and tonumber(err.code) == 404 then
-            local tags, tags_err = GitHub.fetchTags(SELF_OWNER, SELF_REPO, { per_page = 1 })
-            if tags and tags[1] and tags[1].name then
-                release = {
-                    tag_name = tags[1].name,
-                    body = _("No GitHub release was found; updating from the latest tag."),
-                    assets = {},
-                }
-            else
-                err = tags_err or err
-            end
-        end
+        local body, err = fetchGitHubRaw("rollingshmily", "appstore.koplugin", "main", "_meta.lua")
         UIManager:close(progress)
 
-        if not release then
+        if not body then
             UIManager:show(InfoMessage:new{
                 text = _("Failed to check updates: ") .. formatGitHubError(err),
                 timeout = 6,
@@ -7564,11 +7548,16 @@ function AppStore:checkSelfUpdate()
             return
         end
 
-        local remote_version = release.tag_name or ""
-        remote_version = remote_version:gsub("^v", "")  -- strip v prefix
+        local remote_version = extractMetaField(body, "version")
+        if not remote_version then
+            UIManager:show(InfoMessage:new{
+                text = _("Failed to check updates: ") .. _("Remote version not found."),
+                timeout = 6,
+            })
+            return
+        end
 
-        -- Compare versions
-        if remote_version == current_version then
+        if not isVersionNewer(remote_version, current_version) then
             UIManager:show(InfoMessage:new{
                 text = string.format(_("AppStore is up to date (v%s)."), current_version),
                 timeout = 4,
@@ -7576,53 +7565,22 @@ function AppStore:checkSelfUpdate()
             return
         end
 
-        -- Show update dialog
-        local notes = release.body or _("No release notes.")
         local message = string.format(
             _("AppStore update available!\n\nCurrent: v%s\nLatest: v%s\n\nRelease notes:\n%s"),
-            current_version, remote_version, notes:sub(1, 500)
+            current_version,
+            remote_version,
+            _("Updating from the latest main branch snapshot.")
         )
 
         UIManager:show(ConfirmBox:new{
             text = message,
             ok_text = _("Update now"),
             ok_callback = function()
-                self:performSelfUpdate(release)
+                self:downloadAndInstallUpdate(GitHub.proxyUrl("https://github.com/rollingshmily/appstore.koplugin/archive/refs/heads/main.zip"))
             end,
             cancel_text = _("Later"),
         })
     end)
-end
-
-function AppStore:performSelfUpdate(release)
-    if not release or not release.assets or #release.assets == 0 then
-        -- Fallback: download zipball
-        local url = GitHub.proxyUrl(string.format(
-            "https://github.com/rollingshmily/appstore.koplugin/archive/refs/tags/%s.zip",
-            release.tag_name or "main"
-        ))
-        self:downloadAndInstallUpdate(url)
-        return
-    end
-
-    -- Find the first zip/tar.gz asset
-    local asset_url = nil
-    for _, asset in ipairs(release.assets) do
-        if asset.name and (asset.name:match("%.zip$") or asset.name:match("%.tar%.gz$")) then
-            asset_url = GitHub.proxyUrl(asset.browser_download_url)
-            break
-        end
-    end
-
-    if not asset_url then
-        -- Fallback to zipball
-        asset_url = GitHub.proxyUrl(release.zipball_url or string.format(
-            "https://github.com/rollingshmily/appstore.koplugin/archive/refs/tags/%s.zip",
-            release.tag_name or "main"
-        ))
-    end
-
-    self:downloadAndInstallUpdate(asset_url)
 end
 
 function AppStore:downloadAndInstallUpdate(url)
