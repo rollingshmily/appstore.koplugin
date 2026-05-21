@@ -258,5 +258,26 @@ function GitHubClient.fetchReleases(owner, repo, opts)
     return results, nil
 end
 
+function GitHubClient.fetchTags(owner, repo, opts)
+    if not owner or not repo then
+        return nil, "missing owner/repo"
+    end
+    opts = opts or {}
+    local per_page = tonumber(opts.per_page) or 30
+    local path = string.format("/repos/%s/%s/tags", owner, repo)
+    local query = string.format("per_page=%d&page=1", per_page)
+    local code, body = request(path, query)
+    if code ~= 200 then
+        logger.warn("GitHub fetch tags error", owner .. "/" .. repo, code, body)
+        return nil, { code = code, body = body }
+    end
+    local ok, parsed = pcall(json.decode, body)
+    if not ok or type(parsed) ~= "table" then
+        logger.warn("GitHub fetch tags decode error", parsed)
+        return nil, "decode"
+    end
+    return parsed, nil
+end
+
 return GitHubClient
 

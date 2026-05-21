@@ -30,7 +30,7 @@ local InputDialog = require("ui/widget/inputdialog")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local FrameContainer = require("ui/widget/container/framecontainer")
 local CenterContainer = require("ui/widget/container/centercontainer")
-local _ = require("gettext")
+local _ = require("appstore_gettext")
 
 local Input = Device.input
 
@@ -7050,28 +7050,44 @@ function AppStore:showReadmeWithTranslation(path, repo)
     end
 
     -- Show options dialog
+    local dialog
     local buttons = {
         {
-            text = _("View original"),
-            callback = function()
-                UIManager:close(self.readme_dialog)
-                RepoContent.openReadme(path)
-            end,
+            {
+                text = _("View original"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(dialog)
+                    RepoContent.openReadme(path)
+                end,
+            },
         },
         {
-            text = _("Translate to Chinese"),
-            callback = function()
-                UIManager:close(self.readme_dialog)
-                self:translateAndShowReadme(path, text, repo)
-            end,
+            {
+                text = _("Translate to Chinese"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(dialog)
+                    self:translateAndShowReadme(path, text, repo)
+                end,
+            },
+        },
+        {
+            {
+                text = _("Cancel"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(dialog)
+                end,
+            },
         },
     }
 
-    self.readme_dialog = ButtonDialog:new{
+    dialog = ButtonDialog:new{
         title = _("README detected as English. What would you like to do?"),
         buttons = buttons,
     }
-    UIManager:show(self.readme_dialog)
+    UIManager:show(dialog)
 end
 
 function AppStore:translateAndShowReadme(path, text, repo)
@@ -7500,6 +7516,18 @@ function AppStore:addToMainMenu(menu_items)
     }
 end
 
+local function formatGitHubError(err)
+    if type(err) == "table" then
+        if err.code then
+            return string.format("HTTP %s", tostring(err.code))
+        end
+        if err.body then
+            return tostring(err.body)
+        end
+    end
+    return tostring(err)
+end
+
 function AppStore:checkSelfUpdate()
     local SELF_OWNER = "rollingshmily"
     local SELF_REPO = "appstore.koplugin"
@@ -7520,11 +7548,23 @@ function AppStore:checkSelfUpdate()
 
     NetworkMgr:runWhenOnline(function()
         local release, err = GitHub.fetchLatestRelease(SELF_OWNER, SELF_REPO)
+        if not release and type(err) == "table" and tonumber(err.code) == 404 then
+            local tags, tags_err = GitHub.fetchTags(SELF_OWNER, SELF_REPO, { per_page = 1 })
+            if tags and tags[1] and tags[1].name then
+                release = {
+                    tag_name = tags[1].name,
+                    body = _("No GitHub release was found; updating from the latest tag."),
+                    assets = {},
+                }
+            else
+                err = tags_err or err
+            end
+        end
         UIManager:close(progress)
 
         if not release then
             UIManager:show(InfoMessage:new{
-                text = _("Failed to check updates: ") .. tostring(err),
+                text = _("Failed to check updates: ") .. formatGitHubError(err),
                 timeout = 6,
             })
             return
