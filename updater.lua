@@ -131,7 +131,7 @@ local function safePath(p)
 end
 
 local function cacheBust(url, token)
-    token = token or tostring(os.time())
+    token = token or tostring(os.time()) .. tostring(math.random(1000000, 9999999))
     local busted = appendQuery(url, "_t", token)
     if url:match("^https://gh%-proxy%.com/https://raw%.githubusercontent%.com/") then
         local inner = appendQuery(url:sub(#"https://gh-proxy.com/" + 1), "_t", token)

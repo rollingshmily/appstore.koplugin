@@ -1,9 +1,9 @@
 {
-  "version": "1.9.4",
+  "version": "1.9.5",
   "files": [
     {
       "path": "_meta.lua",
-      "sha256": "350dcca125937649e7c927363c9d3add9296562b770b244c8fee08ead69fd38d"
+      "sha256": "fec3581b02c2c52b433b0ecede1f34aafd6caf997bd4241b45d5242fad599624"
     },
     {
       "path": "main.lua",
@@ -55,7 +55,7 @@
     },
     {
       "path": "updater.lua",
-      "sha256": "a1ed0e3440eff14cbf623e15fdde1977da5f05ad0b898517e8e511cac2e03fce"
+      "sha256": "cfbb70b511e26341743075361b9038e2364a2decc85c41bf265d0e3dfe7acfcb"
     }
   ]
 }
