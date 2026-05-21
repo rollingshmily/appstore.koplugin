@@ -1,13 +1,13 @@
 {
-  "version": "1.9.2",
+  "version": "1.9.1",
   "files": [
     {
       "path": "_meta.lua",
-      "sha256": "efb88e258fe804f26e99180b6969926444106ed85746d3eaf5ff008ed4957938"
+      "sha256": "2b4fb3097a2e197f437ae57862151e0867bd18eeb464723858328133efe68705"
     },
     {
       "path": "main.lua",
-      "sha256": "0232b603aede85dae7b9c95280a8f73fc737b908212e21fa6b283eb5586622fa"
+      "sha256": "717f54a670e47fffb9df27d4521f45e18e9c66a4b506c8528a63672b6bcda8f8"
     },
     {
       "path": "appstore_cache.lua",
@@ -35,7 +35,7 @@
     },
     {
       "path": "appstore_translator.lua",
-      "sha256": "1821f2291f4b0a92fa4e1efba06004b7672c9edd1d64f757375a19912217aa83"
+      "sha256": "7cf6c6b1d9fc8e5b3a52d75a3f30fa1811f184ee7149dedd589217d97770f7b0"
     },
     {
       "path": "appstore_updates.lua",
