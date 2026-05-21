@@ -7619,23 +7619,31 @@ function AppStore:downloadAndInstallUpdate(url)
         return
     end
 
-    -- Find the root folder in archive (e.g., appstore.koplugin-main/)
-    local entries = reader:listFiles()
-    local root_prefix = nil
-    for _, entry in ipairs(entries) do
-        if entry:match("appstore%.koplugin") then
-            root_prefix = entry:match("^([^/]+/)")
+    local root_prefix
+    for entry in reader:iterate() do
+        if entry.mode == "file" and entry.path:match("_meta%.lua$") then
+            root_prefix = entry.path:match("^([^/]+/)")
             break
         end
     end
+    if reader.rewind then
+        reader:rewind()
+    else
+        reader:close()
+        reader = Archiver.Reader:new()
+        if not reader:open(zip_path) then
+            util.removeFile(zip_path)
+            UIManager:show(InfoMessage:new{ text = _("Failed to open update archive."), timeout = 6 })
+            return
+        end
+    end
 
-    -- Extract files
     local extracted = 0
-    for _, entry in ipairs(entries) do
-        if not entry:match("/$") then  -- skip directories
-            local relative = entry
+    for entry in reader:iterate() do
+        if entry.mode == "file" then
+            local relative = entry.path
             if root_prefix then
-                relative = entry:gsub("^" .. root_prefix:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"), "")
+                relative = entry.path:sub(#root_prefix + 1)
             end
             if relative and relative ~= "" then
                 local target_path = target_dir .. "/" .. relative
@@ -7643,7 +7651,13 @@ function AppStore:downloadAndInstallUpdate(url)
                 if target_parent then
                     util.makePath(target_parent)
                 end
-                reader:extractFile(entry, target_path)
+                local extract_ok = reader:extractToPath(entry.path, target_path)
+                if not extract_ok then
+                    reader:close()
+                    util.removeFile(zip_path)
+                    UIManager:show(InfoMessage:new{ text = _("Failed to extract file: ") .. entry.path, timeout = 6 })
+                    return
+                end
                 extracted = extracted + 1
             end
         end
