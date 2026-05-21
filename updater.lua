@@ -44,7 +44,9 @@ local function rawGet(url)
         sink = ltn12.sink.table(sink_table),
         headers = {
             ["Accept"] = "*/*",
-            ["User-Agent"] = "KOReader-AIAssistant-Updater/0.1",
+            ["Cache-Control"] = "no-cache, no-store, max-age=0",
+            ["Pragma"] = "no-cache",
+            ["User-Agent"] = "KOReader-AppStore-Updater/0.1",
         },
     }
     if _has_socketutil then
@@ -128,10 +130,20 @@ local function safePath(p)
     return p
 end
 
+local function cacheBust(url, token)
+    token = token or tostring(os.time())
+    local busted = appendQuery(url, "_t", token)
+    if url:match("^https://gh%-proxy%.com/https://raw%.githubusercontent%.com/") then
+        local inner = appendQuery(url:sub(#"https://gh-proxy.com/" + 1), "_t", token)
+        busted = appendQuery("https://gh-proxy.com/" .. inner, "_t", token)
+    end
+    return busted
+end
+
 function Updater.fetchManifest(manifest_url)
     if not JSON then return nil, "no_json_module" end
     if not manifest_url or manifest_url == "" then return nil, "no_url" end
-    local fresh_url = appendQuery(manifest_url, "_t", tostring(os.time()))
+    local fresh_url = cacheBust(manifest_url)
     local body, err = httpGet(fresh_url)
     if not body then return nil, err end
     local ok, parsed = pcall(JSON.decode, body)

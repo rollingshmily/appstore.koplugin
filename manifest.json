@@ -1,9 +1,9 @@
 {
-  "version": "1.8.1",
+  "version": "1.8.2",
   "files": [
     {
       "path": "_meta.lua",
-      "sha256": "a8369b1565f58a7d487749f9c653d08080dbacae206c5fa7021c4deeaf74a28e"
+      "sha256": "2566461b85b22a733b0a004b89ba4bc5cb47ac6a99f9defa5e1952e2008a9e1b"
     },
     {
       "path": "main.lua",
@@ -51,7 +51,7 @@
     },
     {
       "path": "updater.lua",
-      "sha256": "5f505868e0a93eeb863cd8a0f66f7092150f62df2e7b29ab0cb9c3a7741ca1ba"
+      "sha256": "a1ed0e3440eff14cbf623e15fdde1977da5f05ad0b898517e8e511cac2e03fce"
     }
   ]
 }
