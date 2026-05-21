@@ -3712,6 +3712,9 @@ AppStoreBrowserDialog = FocusManager:extend{
     on_next_page = nil,
     on_dismiss = nil,
     on_settings_tap = nil,
+    on_switch_kind = nil,
+    on_refresh_tap = nil,
+    current_kind = "plugin",
 }
 
 function AppStoreBrowserDialog:init()
@@ -3734,15 +3737,31 @@ function AppStoreBrowserDialog:init()
         self.key_events.PrevPage = { { Input.group.PgBack } }
     end
 
+    local left_icon
+    local left_icon_tap_callback
+    if self.on_switch_kind then
+        left_icon = self.current_kind == "plugin" and "appbar.patches" or "appbar.menu"
+        left_icon_tap_callback = function()
+            self.on_switch_kind()
+        end
+    elseif self.on_settings_tap then
+        left_icon = "appbar.settings"
+        left_icon_tap_callback = function()
+            self.on_settings_tap()
+        end
+    end
+
     self.title_bar = TitleBar:new{
         width = self.width,
         title = self.title,
         fullscreen = false,
         with_bottom_line = true,
-        left_icon = "appbar.settings",
-        left_icon_tap_callback = function()
-            if self.on_settings_tap then
-                self.on_settings_tap()
+        left_icon = left_icon,
+        left_icon_tap_callback = left_icon_tap_callback,
+        right_icon = "appbar.refresh",
+        right_icon_tap_callback = function()
+            if self.on_refresh_tap then
+                self.on_refresh_tap()
             end
         end,
         close_callback = function()
@@ -3862,7 +3881,7 @@ function AppStoreBrowserDialog:init()
 
     local title_height = self.title_bar:getHeight()
     local footer_height = math.max(first_button:getSize().h, prev_button:getSize().h, page_button:getSize().h, next_button:getSize().h, last_button:getSize().h)
-    local vertical_padding = Size.span.vertical_default
+    local vertical_padding = 0
     local body_height = self.screen_h - title_height - footer_height - vertical_padding
     if body_height < math.floor(self.screen_h * 0.5) then
         body_height = math.floor(self.screen_h * 0.5)
@@ -5536,7 +5555,6 @@ function AppStore:buildBrowserEntries()
     self:ensureBrowserState()
     local kind = self.browser_state.kind or "plugin"
     local items = {}
-    local other_kind = kind == "plugin" and "patch" or "plugin"
 
     if self.match_context then
         if self.match_context.kind == "plugin" and self.match_context.plugin then
@@ -5567,47 +5585,12 @@ function AppStore:buildBrowserEntries()
     end
 
     table.insert(items, {
-        text = other_kind == "plugin" and "↔ " .. _("Switch to plugins tab") or "↔ " .. _("Switch to patches tab"),
+        text = _("AppStore settings"),
         callback = function()
-            self.browser_state.kind = other_kind
-            self.browser_state.page = 1
-            self.browser_state.scroll_offset = nil
-            self:resetFiltersForRefresh()
-            self:saveBrowserState()
-            self:closeBrowserMenu()
-            self:showBrowser()
+            self:showAppStoreSettingsDialog()
         end,
+        keep_menu_open = true,
     })
-
-    table.insert(items, {
-        text = _("Refresh cache"),
-        callback = function()
-            self:resetBrowserScrollState()
-            self:resetFiltersForRefresh()
-            self:closeBrowserMenu()
-            NetworkMgr:runWhenOnline(function()
-                UIManager:nextTick(function()
-                    local start_notice = InfoMessage:new{
-                        text = _("Caching started, please wait…"),
-                        timeout = 5,
-                    }
-                    UIManager:show(start_notice)
-                    UIManager:nextTick(function()
-                        self:refreshCache(kind)
-                        UIManager:nextTick(function()
-                            self:showBrowser(kind)
-                            UIManager:nextTick(function()
-                                if self.browser_menu then
-                                    UIManager:setDirty(self.browser_menu)
-                                end
-                            end)
-                        end)
-                    end)
-                end)
-            end)
-        end,
-    })
-    items[#items].separator = true
 
     if kind == "plugin" then
         table.insert(items, {
@@ -5636,8 +5619,6 @@ function AppStore:buildBrowserEntries()
         end,
         keep_menu_open = true,
     })
-    items[#items].separator = true
-
     table.insert(items, {
         text = self:getSortSummary(),
         callback = function()
@@ -5648,17 +5629,6 @@ function AppStore:buildBrowserEntries()
     items[#items].separator = true
 
     local filtered, total = self:getFilteredDescriptors(kind)
-    table.insert(items, {
-        text = self:getCacheStatusLine(kind, total),
-        select_enabled = false,
-    })
-    local warning = self:getCacheWarning(kind)
-    if warning then
-        table.insert(items, {
-            text = warning,
-            select_enabled = false,
-        })
-    end
     local patch_display_entries
     if kind == "patch" then
         patch_display_entries = self:collectPatchEntries(filtered)
@@ -5670,10 +5640,18 @@ function AppStore:buildBrowserEntries()
     else
         match_line = string.format(_("Matching entries: %s / %s"), tostring(#filtered), tostring(total))
     end
+
     table.insert(items, {
-        text = match_line,
+        text = self:getCacheStatusLine(kind, total) .. "\n" .. match_line,
         select_enabled = false,
     })
+    local warning = self:getCacheWarning(kind)
+    if warning then
+        table.insert(items, {
+            text = warning,
+            select_enabled = false,
+        })
+    end
     items[#items].separator = true
 
     local total_pages = math.max(1, math.ceil(display_total / BROWSER_PAGE_SIZE))
@@ -5768,7 +5746,9 @@ function AppStore:showBrowser(kind)
             end)
         end
     end
-    local title = self.browser_state.kind == "plugin" and _("App Store · Plugins") or _("App Store · Patches")
+    local current_kind = self.browser_state.kind or "plugin"
+    local other_kind = current_kind == "plugin" and "patch" or "plugin"
+    local title = current_kind == "plugin" and _("App Store · Plugins") or _("App Store · Patches")
     local items, total_pages = self:buildBrowserEntries()
     local dialog = AppStoreBrowserDialog:new{
         title = title,
@@ -5776,8 +5756,42 @@ function AppStore:showBrowser(kind)
         page = self.browser_state.page,
         total_pages = total_pages,
         scroll_offset = self.browser_state.scroll_offset,
+        current_kind = current_kind,
         on_settings_tap = function()
             self:showAppStoreSettingsDialog()
+        end,
+        on_switch_kind = function()
+            self.browser_state.kind = other_kind
+            self.browser_state.page = 1
+            self.browser_state.scroll_offset = nil
+            self:resetFiltersForRefresh()
+            self:saveBrowserState()
+            self:reopenBrowser(other_kind)
+        end,
+        on_refresh_tap = function()
+            self:resetBrowserScrollState()
+            self:resetFiltersForRefresh()
+            self:closeBrowserMenu()
+            NetworkMgr:runWhenOnline(function()
+                UIManager:nextTick(function()
+                    local start_notice = InfoMessage:new{
+                        text = _("Caching started, please wait…"),
+                        timeout = 5,
+                    }
+                    UIManager:show(start_notice)
+                    UIManager:nextTick(function()
+                        self:refreshCache(current_kind)
+                        UIManager:nextTick(function()
+                            self:showBrowser(current_kind)
+                            UIManager:nextTick(function()
+                                if self.browser_menu then
+                                    UIManager:setDirty(self.browser_menu)
+                                end
+                            end)
+                        end)
+                    end)
+                end)
+            end)
         end,
         on_first_page = function()
             if self.browser_state.page > 1 then
@@ -5955,6 +5969,79 @@ function AppStore:showFilterDialog()
     dialog:onShowKeyboard()
 end
 
+function AppStore:showTranslatorSettingsDialog()
+    local cfg = AppStoreSettings:readSetting("translator_settings") or {}
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("Translator settings"),
+        fields = {
+            {
+                description = _("API base URL"),
+                text = cfg.base_url or "https://openrouter.ai/api/v1/chat/completions",
+                hint = "https://openrouter.ai/api/v1/chat/completions",
+            },
+            {
+                description = _("API key"),
+                text = cfg.api_key or "",
+                hint = _("Required for translation"),
+            },
+            {
+                description = _("Model"),
+                text = cfg.model or "qwen/qwen3-14b:free",
+                hint = _("e.g., qwen/qwen3-14b:free"),
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    background = Blitbuffer.COLOR_WHITE,
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Reset"),
+                    background = Blitbuffer.COLOR_WHITE,
+                    callback = function()
+                        AppStoreSettings:saveSetting("translator_settings", {
+                            provider = "openai_compatible",
+                            base_url = "https://openrouter.ai/api/v1/chat/completions",
+                            api_key = "",
+                            model = "qwen/qwen3-14b:free",
+                        })
+                        AppStoreSettings:flush()
+                        UIManager:close(dialog)
+                        self:showTranslatorSettingsDialog()
+                    end,
+                },
+                {
+                    text = _("Save"),
+                    background = Blitbuffer.COLOR_WHITE,
+                    is_enter_default = true,
+                    callback = function()
+                        local fields = dialog:getFields()
+                        AppStoreSettings:saveSetting("translator_settings", {
+                            provider = "openai_compatible",
+                            base_url = util.trim(fields[1] or ""),
+                            api_key = util.trim(fields[2] or ""),
+                            model = util.trim(fields[3] or ""),
+                        })
+                        AppStoreSettings:flush()
+                        UIManager:close(dialog)
+                        UIManager:show(InfoMessage:new{
+                            text = _("Translator settings saved."),
+                            timeout = 3,
+                        })
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
 function AppStore:showAppStoreSettingsDialog()
     -- Opened via the gear icon on the browser title bar.
     -- Keep the toggle list minimal; additional settings can be added below as
@@ -5965,6 +6052,16 @@ function AppStore:showAppStoreSettingsDialog()
     local current_kind = (self.browser_state and self.browser_state.kind) or "plugin"
     local dialog
     local buttons = {
+        {
+            {
+                text = _("Translator settings"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(dialog)
+                    self:showTranslatorSettingsDialog()
+                end,
+            },
+        },
         {
             {
                 text = string.format("%s  %s", mark, _("Include 0-star forks")),
@@ -7120,7 +7217,84 @@ local AppStoreReadmeDialog = FocusManager:extend{
     mode = "original",
     pages = nil,
     page = 1,
+    title_bar = nil,
+    text_box = nil,
+    text_frame = nil,
+    scroller = nil,
 }
+
+function AppStoreReadmeDialog:getPageTitle()
+    local page_count = #(self.pages or {})
+    local page_title = self.title or _("README")
+    if page_count > 1 then
+        page_title = string.format("%s (%d/%d)", page_title, self.page or 1, page_count)
+    end
+    return page_title
+end
+
+function AppStoreReadmeDialog:_buildHeader()
+    self.title_bar = TitleBar:new{
+        width = self.dimen.w,
+        title = self:getPageTitle(),
+        fullscreen = false,
+        with_bottom_line = true,
+        left_icon = nil,
+        left_text = (self.mode == "translated") and _("原") or _("译"),
+        left_icon_tap_callback = function()
+            self:onTranslateButton()
+        end,
+        close_callback = function()
+            UIManager:close(self)
+        end,
+        show_parent = self,
+    }
+end
+
+function AppStoreReadmeDialog:_rebuildContent()
+    self:_buildHeader()
+    local screen_w = self.dimen.w
+    local screen_h = self.dimen.h
+    local content_width = screen_w
+    local content_height = screen_h - self.title_bar:getHeight()
+    local face = TextWidget.getDefaultFace and TextWidget:getDefaultFace()
+    if not face and Font and Font.getFace then
+        face = Font:getFace("infofont")
+    end
+    local page_text = (self.pages and self.pages[self.page or 1]) or ""
+    self.text_box = TextBoxWidget:new{
+        text = softWrapLongTokens(page_text, 100),
+        width = content_width - 2 * Size.padding.default,
+        face = face,
+    }
+    self.text_frame = FrameContainer:new{
+        padding = Size.padding.default,
+        bordersize = 0,
+        self.text_box,
+    }
+    self.scroller = ScrollableContainer:new{
+        dimen = Geom:new{ w = screen_w, h = content_height },
+        show_parent = self,
+        self.text_frame,
+    }
+    self.cropping_widget = self.scroller
+    self[1] = FrameContainer:new{
+        background = Blitbuffer.COLOR_WHITE,
+        bordersize = 0,
+        padding = 0,
+        dimen = self.dimen:copy(),
+        VerticalGroup:new{
+            self.title_bar,
+            self.scroller,
+        },
+    }
+    self.layout = {}
+    if self.title_bar.generateHorizontalLayout then
+        local title_rows = self.title_bar:generateHorizontalLayout()
+        for _, row in ipairs(title_rows) do
+            table.insert(self.layout, row)
+        end
+    end
+end
 
 function AppStoreReadmeDialog:init()
     self.show_parent = self
@@ -7135,77 +7309,13 @@ function AppStoreReadmeDialog:init()
         end
     end
 
-    local page_count = #(self.pages or {})
-    local page_title = self.title or _("README")
-    if page_count > 1 then
-        page_title = string.format("%s (%d/%d)", page_title, self.page or 1, page_count)
-    end
-    local translate_button = Button:new{
-        text = (self.mode == "translated") and _("原") or _("译"),
-        menu_style = true,
-        bordersize = 0,
-        background = Blitbuffer.COLOR_WHITE,
-        callback = function()
-            self:onTranslateButton()
-        end,
-    }
-    local close_button = Button:new{
-        text = "✕",
-        menu_style = true,
-        bordersize = 0,
-        background = Blitbuffer.COLOR_WHITE,
-        callback = function()
-            UIManager:close(self)
-        end,
-    }
-    self.header = HorizontalGroup:new{
-        translate_button,
-        HorizontalSpan:new{ width = Size.span.horizontal_default },
-        TextWidget:new{
-            text = page_title,
-            width = screen_w - translate_button:getSize().w - close_button:getSize().w - 4 * Size.span.horizontal_default,
-            face = Font:getFace("smallinfofont"),
-        },
-        HorizontalSpan:new{ width = Size.span.horizontal_default },
-        close_button,
-    }
+    self:_rebuildContent()
+end
 
-    local content_width = math.floor(screen_w * 0.96)
-    local content_height = screen_h - self.header:getSize().h - Size.padding.default
-    local face = TextWidget.getDefaultFace and TextWidget:getDefaultFace()
-    if not face and Font and Font.getFace then
-        face = Font:getFace("infofont")
+function AppStoreReadmeDialog:getScrollOffset()
+    if self.scroller then
+        return self.scroller:getScrolledOffset()
     end
-    local page_text = (self.pages and self.pages[self.page or 1]) or ""
-    local box = TextBoxWidget:new{
-        text = softWrapLongTokens(page_text, 100),
-        width = content_width - 2 * Size.padding.default,
-        face = face,
-    }
-    local frame = FrameContainer:new{
-        padding = Size.padding.default,
-        bordersize = 0,
-        box,
-    }
-    self.scroller = ScrollableContainer:new{
-        dimen = Geom:new{ w = screen_w, h = content_height },
-        show_parent = self,
-        frame,
-    }
-    self.cropping_widget = self.scroller
-    self[1] = FrameContainer:new{
-        background = Blitbuffer.COLOR_WHITE,
-        bordersize = 0,
-        padding = 0,
-        dimen = self.dimen:copy(),
-        VerticalGroup:new{
-            self.header,
-            CenterContainer:new{
-                dimen = Geom:new{ w = screen_w, h = content_height },
-                self.scroller,
-            },
-        },
-    }
 end
 
 function AppStoreReadmeDialog:onClose()
@@ -7267,17 +7377,14 @@ function AppStoreReadmeDialog:replaceContent(mode, page)
     self.mode = mode or "original"
     self.pages = splitReadmePages(formatReadmeForTextBox(source or ""), 6000)
     self.page = math.max(1, math.min(page or 1, #(self.pages or {})))
-    UIManager:close(self)
-    UIManager:show(AppStoreReadmeDialog:new{
-        appstore = self.appstore,
-        repo = self.repo,
-        title = self.title,
-        original_text = self.original_text,
-        translated_text = self.translated_text,
-        mode = self.mode,
-        pages = self.pages,
-        page = self.page,
-    })
+    local offset = self.getScrollOffset and self:getScrollOffset()
+    self:_rebuildContent()
+    if offset and self.scroller then
+        self.scroller:setScrolledOffset(offset)
+    end
+    UIManager:setDirty(self, function()
+        return "ui", self.dimen
+    end)
     return true
 end
 
