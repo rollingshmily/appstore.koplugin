@@ -7023,14 +7023,13 @@ function AppStore:showReadme(repo)
         return
     end
     NetworkMgr:runWhenOnline(function()
-        local ok, path_or_err = RepoContent.fetchReadme(owner, repo.name)
+        local ok, text_or_err = RepoContent.fetchReadme(owner, repo.name)
         if not ok then
-            UIManager:show(InfoMessage:new{ text = _("README download failed: ") .. tostring(path_or_err), timeout = 4 })
+            UIManager:show(InfoMessage:new{ text = _("README download failed: ") .. tostring(text_or_err), timeout = 4 })
             return
         end
         self:closeBrowserMenu()
-        -- Show translation options
-        self:showReadmeWithTranslation(path_or_err, repo)
+        self:showReadmeWithTranslation(text_or_err, repo)
     end)
 end
 
@@ -7049,38 +7048,24 @@ function AppStore:showReadmeDialog(title, text)
     UIManager:show(dialog)
 end
 
-function AppStore:openReadmeInDialog(path, repo, text_override)
-    local text = text_override
-    if not text then
-        local err
-        text, err = RepoContent.readReadme(path)
-        if not text then
-            UIManager:show(InfoMessage:new{ text = tostring(err), timeout = 4 })
-            return
-        end
-    end
+function AppStore:openReadmeInDialog(repo, text)
     local owner = repo and (repo.owner or (repo.data and repo.data.owner and repo.data.owner.login))
     local repo_name = repo and repo.name
     local title = (owner and repo_name) and string.format("%s/%s · README", owner, repo_name) or _("README")
     self:showReadmeDialog(title, text)
 end
 
-function AppStore:showReadmeWithTranslation(path, repo)
-    -- Read the file to check if translation is needed
-    local text, err = util.readFromFile(path)
+function AppStore:showReadmeWithTranslation(text, repo)
     if not text or text == "" then
-        self:openReadmeInDialog(path, repo)
+        UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
         return
     end
 
-    -- Check if text needs translation
     if not Translator.needsTranslation(text) then
-        -- Already Chinese, open directly
-        self:openReadmeInDialog(path, repo)
+        self:openReadmeInDialog(repo, text)
         return
     end
 
-    -- Show options dialog
     local dialog
     local buttons = {
         {
@@ -7089,7 +7074,7 @@ function AppStore:showReadmeWithTranslation(path, repo)
                 background = Blitbuffer.COLOR_WHITE,
                 callback = function()
                     UIManager:close(dialog)
-                    self:openReadmeInDialog(path, repo)
+                    self:openReadmeInDialog(repo, text)
                 end,
             },
         },
@@ -7099,7 +7084,7 @@ function AppStore:showReadmeWithTranslation(path, repo)
                 background = Blitbuffer.COLOR_WHITE,
                 callback = function()
                     UIManager:close(dialog)
-                    self:translateAndShowReadme(path, text, repo)
+                    self:translateAndShowReadme(text, repo)
                 end,
             },
         },
@@ -7121,7 +7106,7 @@ function AppStore:showReadmeWithTranslation(path, repo)
     UIManager:show(dialog)
 end
 
-function AppStore:translateAndShowReadme(path, text, repo)
+function AppStore:translateAndShowReadme(text, repo)
     local Trapper = require("ui/trapper")
     local progress = InfoMessage:new{
         text = _("Translating…"),
@@ -7144,26 +7129,11 @@ function AppStore:translateAndShowReadme(path, text, repo)
     end
 
     UIManager:show(InfoMessage:new{ text = _("Translation failed. Showing original."), timeout = 4 })
-    self:openReadmeInDialog(path, repo)
+    self:openReadmeInDialog(repo, text)
 end
 
 function AppStore:showTranslatedReadme(translatedText, repo)
-    -- Create a temporary file with translated content
-    local DataStorage = require("datastorage")
-    local cache_dir = DataStorage:getDataDir() .. "/cache/appstore/readme"
-    util.makePath(cache_dir)
-
-    local safe_owner = (repo.owner or "unknown"):gsub("[^%w_-]", "_")
-    local safe_repo = (repo.name or "unknown"):gsub("[^%w_-]", "_")
-    local path = string.format("%s/%s_%s_README_zh.md", cache_dir, safe_owner, safe_repo)
-
-    local ok, err = util.writeToFile(translatedText, path)
-    if not ok then
-        UIManager:show(InfoMessage:new{ text = _("Failed to save translation."), timeout = 4 })
-        return
-    end
-
-    self:openReadmeInDialog(path, repo, translatedText)
+    self:openReadmeInDialog(repo, translatedText)
 end
 
 local function appendUniqueRepo(target, seen, repo)
