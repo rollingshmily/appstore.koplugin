@@ -7092,6 +7092,13 @@ local AppStoreReadmeDialog = FocusManager:extend{
     page = 1,
 }
 
+local function showReadmeDialog(dialog)
+    UIManager:show(dialog)
+    UIManager:nextTick(function()
+        UIManager:setDirty(dialog, "full")
+    end)
+end
+
 function AppStoreReadmeDialog:getPageTitle()
     local page_count = #(self.pages or {})
     local page_title = self.title or _("README")
@@ -7230,7 +7237,7 @@ function AppStoreReadmeDialog:replaceContent(mode, page)
     self.pages = splitReadmePages(formatReadmeForTextBox(source or ""), 6000)
     self.page = math.max(1, math.min(page or 1, #(self.pages or {})))
     UIManager:close(self)
-    UIManager:show(AppStoreReadmeDialog:new{
+    showReadmeDialog(AppStoreReadmeDialog:new{
         appstore = self.appstore,
         repo = self.repo,
         title = self.title,
@@ -7249,7 +7256,7 @@ function AppStore:showReadmeDialog(title, text, repo)
         return
     end
     local pages = splitReadmePages(formatReadmeForTextBox(text), 6000)
-    UIManager:show(AppStoreReadmeDialog:new{
+    showReadmeDialog(AppStoreReadmeDialog:new{
         appstore = self,
         repo = repo,
         title = title or _("README"),
