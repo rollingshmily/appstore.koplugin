@@ -4,6 +4,6 @@ return {
     name = "appstore",
     fullname = _("App Store"),
     description = _([[Discover and manage community plugins and patches from GitHub topics.]]),
-    version = "1.9.8",
+    version = "1.9.9",
 }
 

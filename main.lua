@@ -3429,18 +3429,21 @@ function AppStore:resetFiltersForRefresh()
     self:saveBrowserState()
 end
 
+local APPSTORE_LIST_FACE
+local APPSTORE_LIST_LINE_HEIGHT
+
 function AppStoreListItem:init()
     local entry = self.entry or {}
     self.entry = entry
     local content_width = self.width or math.floor(math.min(Device.screen:getWidth(), Device.screen:getHeight()) * 0.9)
     local text_color = (entry.dim or entry.select_enabled == false) and Blitbuffer.COLOR_DARK_GRAY or Blitbuffer.COLOR_BLACK
-    local face = Font:getFace("smallinfofont")
-    local line_height_px = math.floor(face.size * 1.4)
-    local max_height = line_height_px * 3
+    APPSTORE_LIST_FACE = APPSTORE_LIST_FACE or Font:getFace("smallinfofont")
+    APPSTORE_LIST_LINE_HEIGHT = APPSTORE_LIST_LINE_HEIGHT or math.floor(APPSTORE_LIST_FACE.size * 1.4)
+    local max_height = APPSTORE_LIST_LINE_HEIGHT * 3
     local text_box = TextBoxWidget:new{
         text = entry.text or "",
         width = content_width - 2 * Size.padding.default,
-        face = face,
+        face = APPSTORE_LIST_FACE,
         fgcolor = text_color,
         alignment = "left",
         justified = false,
@@ -7081,12 +7084,18 @@ local function splitReadmePages(text, max_len)
     return pages
 end
 
+local function buildReadmePages(text)
+    return splitReadmePages(formatReadmeForTextBox(text), 6000)
+end
+
 local AppStoreReadmeDialog = FocusManager:extend{
     appstore = nil,
     repo = nil,
     title = nil,
     original_text = nil,
     translated_text = nil,
+    original_pages = nil,
+    translated_pages = nil,
     mode = "original",
     pages = nil,
     page = 1,
@@ -7095,7 +7104,9 @@ local AppStoreReadmeDialog = FocusManager:extend{
 local function showReadmeDialog(dialog)
     UIManager:show(dialog)
     UIManager:nextTick(function()
-        UIManager:setDirty(dialog, "full")
+        UIManager:setDirty(dialog, function()
+            return "ui", dialog.dimen
+        end)
     end)
 end
 
@@ -7232,9 +7243,14 @@ function AppStoreReadmeDialog:onTranslateButton()
 end
 
 function AppStoreReadmeDialog:replaceContent(mode, page)
-    local source = mode == "translated" and self.translated_text or self.original_text
     self.mode = mode or "original"
-    self.pages = splitReadmePages(formatReadmeForTextBox(source or ""), 6000)
+    if self.mode == "translated" then
+        self.translated_pages = self.translated_pages or buildReadmePages(self.translated_text or "")
+        self.pages = self.translated_pages
+    else
+        self.original_pages = self.original_pages or buildReadmePages(self.original_text or "")
+        self.pages = self.original_pages
+    end
     self.page = math.max(1, math.min(page or 1, #(self.pages or {})))
     UIManager:close(self)
     showReadmeDialog(AppStoreReadmeDialog:new{
@@ -7243,6 +7259,8 @@ function AppStoreReadmeDialog:replaceContent(mode, page)
         title = self.title,
         original_text = self.original_text,
         translated_text = self.translated_text,
+        original_pages = self.original_pages,
+        translated_pages = self.translated_pages,
         mode = self.mode,
         pages = self.pages,
         page = self.page,
@@ -7255,12 +7273,13 @@ function AppStore:showReadmeDialog(title, text, repo)
         UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
         return
     end
-    local pages = splitReadmePages(formatReadmeForTextBox(text), 6000)
+    local pages = buildReadmePages(text)
     showReadmeDialog(AppStoreReadmeDialog:new{
         appstore = self,
         repo = repo,
         title = title or _("README"),
         original_text = text,
+        original_pages = pages,
         mode = "original",
         pages = pages,
         page = 1,
