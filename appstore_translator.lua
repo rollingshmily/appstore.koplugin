@@ -1,4 +1,5 @@
 local http = require("socket.http")
+local https = require("ssl.https")
 local ltn12 = require("ltn12")
 local json = require("json")
 local logger = require("logger")
@@ -6,27 +7,29 @@ local DataStorage = require("datastorage")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
 
+local ok_cfg, AppStoreConfig = pcall(require, "appstore_configuration")
+if not ok_cfg then
+    AppStoreConfig = {}
+end
+
 local Translator = {}
 
 local CACHE_DIR = DataStorage:getDataDir() .. "/cache/appstore/translations"
-local API_URL = "https://api.mymemory.translated.net/get"
-local MAX_QUERY_LEN = 500 -- MyMemory API limit per request
+local MYMEMORY_API_URL = "https://api.mymemory.translated.net/get"
+local MYMEMORY_CHUNK_LEN = 500
+local OPENAI_CHUNK_LEN = 6000
 
---- Ensure cache directory exists
 local function ensureCacheDir()
     util.makePath(CACHE_DIR)
 end
 
---- Generate cache key from text (hash-based filename)
-local function getCacheKey(text)
-    -- Simple hash: use first 32 chars + length
-    local safe = text:gsub("[^%w]", "_"):sub(1, 32)
-    return safe .. "_" .. #text
+local function getCacheKey(text, provider)
+    local safe = tostring(text or ""):gsub("[^%w]", "_"):sub(1, 32)
+    return tostring(provider or "default") .. "_" .. safe .. "_" .. #tostring(text or "")
 end
 
---- Read cached translation
-local function readCache(text)
-    local key = getCacheKey(text)
+local function readCache(text, provider)
+    local key = getCacheKey(text, provider)
     local path = CACHE_DIR .. "/" .. key .. ".txt"
     local f = io.open(path, "r")
     if f then
@@ -36,13 +39,11 @@ local function readCache(text)
             return content
         end
     end
-    return nil
 end
 
---- Write translation to cache
-local function writeCache(text, translation)
+local function writeCache(text, provider, translation)
     ensureCacheDir()
-    local key = getCacheKey(text)
+    local key = getCacheKey(text, provider)
     local path = CACHE_DIR .. "/" .. key .. ".txt"
     local f = io.open(path, "w")
     if f then
@@ -51,7 +52,6 @@ local function writeCache(text, translation)
     end
 end
 
---- URL encode a string
 local function urlEncode(str)
     if str then
         str = str:gsub("\n", " ")
@@ -62,167 +62,208 @@ local function urlEncode(str)
     return str
 end
 
---- Translate a single chunk (up to 500 chars) via MyMemory API
-local function translateChunk(text, sourceLang, targetLang)
-    if not text or text == "" then
-        return ""
+local function splitIntoChunks(text, max_len)
+    max_len = max_len or OPENAI_CHUNK_LEN
+    local chunks = {}
+    text = tostring(text or "")
+    if #text <= max_len then
+        return { text }
     end
+    local remaining = text
+    while #remaining > 0 do
+        if #remaining <= max_len then
+            table.insert(chunks, remaining)
+            break
+        end
+        local break_pos = max_len
+        local search_start = math.max(1, max_len - 1200)
+        for pos = max_len, search_start, -1 do
+            local c = remaining:sub(pos, pos)
+            if c == "\n" or c == "." or c == "!" or c == "?" or c == ";" then
+                break_pos = pos
+                break
+            end
+        end
+        table.insert(chunks, remaining:sub(1, break_pos))
+        remaining = remaining:sub(break_pos + 1)
+    end
+    return chunks
+end
 
-    sourceLang = sourceLang or "en"
-    targetLang = targetLang or "zh-CN"
+local function requestJson(url, headers, body)
+    if url:lower():match("^https://") then
+        https.cert_verify = false
+    end
+    local response = {}
+    headers = headers or {}
+    headers["Content-Type"] = headers["Content-Type"] or "application/json"
+    headers["Accept"] = headers["Accept"] or "application/json"
+    headers["Content-Length"] = tostring(#body)
+    local request_fn = url:lower():match("^https://") and https.request or http.request
+    local _, code = request_fn{
+        url = url,
+        method = "POST",
+        headers = headers,
+        source = ltn12.source.string(body),
+        sink = ltn12.sink.table(response),
+    }
+    code = tonumber(code)
+    local response_body = table.concat(response)
+    if code ~= 200 then
+        return nil, string.format("HTTP %s: %s", tostring(code), response_body:sub(1, 300))
+    end
+    local ok, parsed = pcall(json.decode, response_body)
+    if not ok or type(parsed) ~= "table" then
+        return nil, "decode error"
+    end
+    return parsed
+end
 
+local function getOpenAISettings()
+    local cfg = AppStoreConfig.translator or {}
+    local openai = cfg.openai_compatible or cfg.openai or {}
+    return {
+        provider = "openai_compatible",
+        base_url = openai.base_url or "https://openrouter.ai/api/v1/chat/completions",
+        api_key = openai.api_key or "",
+        model = openai.model or "qwen/qwen3-14b:free",
+        max_tokens = openai.max_tokens or 8192,
+        temperature = openai.temperature or 0.2,
+        extra_headers = openai.extra_headers or {},
+    }
+end
+
+local function translateOpenAIChunk(text, source_lang, target_lang)
+    local settings = getOpenAISettings()
+    if not settings.api_key or settings.api_key == "" then
+        return nil, "OpenAI-compatible translator is not configured. Set translator.openai_compatible.api_key."
+    end
+    local prompt = table.concat({
+        "Translate the following README content to " .. (target_lang or "Simplified Chinese") .. ".",
+        "Preserve Markdown structure, headings, lists, code blocks, links, and placeholders.",
+        "Do not summarize. Do not add explanations. Return only the translated content.",
+        "",
+        text,
+    }, "\n")
+    local body = json.encode({
+        model = settings.model,
+        messages = {
+            { role = "system", content = "You are a precise technical documentation translator." },
+            { role = "user", content = prompt },
+        },
+        temperature = settings.temperature,
+        max_tokens = settings.max_tokens,
+        stream = false,
+    })
+    local headers = {
+        ["Authorization"] = "Bearer " .. settings.api_key,
+        ["HTTP-Referer"] = "https://github.com/rollingshmily/appstore.koplugin",
+        ["X-Title"] = "appstore.koplugin",
+        ["User-Agent"] = "KOReader-AppStore",
+    }
+    for key, value in pairs(settings.extra_headers or {}) do
+        headers[key] = value
+    end
+    local parsed, err = requestJson(settings.base_url, headers, body)
+    if not parsed then
+        return nil, err
+    end
+    local choices = parsed.choices
+    local content = choices and choices[1] and choices[1].message and choices[1].message.content
+    if not content or content == "" then
+        local msg = parsed.error and parsed.error.message
+        return nil, msg or "empty model response"
+    end
+    return content
+end
+
+local function translateMyMemoryChunk(text, source_lang, target_lang)
     local encoded = urlEncode(text)
-    local url = string.format("%s?q=%s&langpair=%s|%s", API_URL, encoded, sourceLang, targetLang)
-
+    local url = string.format("%s?q=%s&langpair=%s|%s", MYMEMORY_API_URL, encoded, source_lang or "en", target_lang or "zh-CN")
     local response = {}
     local _, code = http.request{
         url = url,
         sink = ltn12.sink.table(response),
-        headers = {
-            ["User-Agent"] = "KOReader-AppStore",
-        },
+        headers = { ["User-Agent"] = "KOReader-AppStore" },
     }
-
     code = tonumber(code)
     if code ~= 200 then
         return nil, string.format("HTTP %s", tostring(code))
     end
-
-    local body = table.concat(response)
-    local ok, parsed = pcall(json.decode, body)
+    local ok, parsed = pcall(json.decode, table.concat(response))
     if not ok or type(parsed) ~= "table" then
         return nil, "decode error"
     end
-
     if parsed.responseStatus ~= 200 and parsed.responseStatus ~= "200" then
         return nil, parsed.responseDetails or "API error"
     end
-
     local translated = parsed.responseData and parsed.responseData.translatedText
     if not translated or translated == "" then
         return nil, "empty result"
     end
-
     return translated
 end
 
---- Split text into chunks for translation
---- Tries to split at sentence boundaries when possible
-local function splitIntoChunks(text, maxLen)
-    maxLen = maxLen or MAX_QUERY_LEN
-    local chunks = {}
-
-    if #text <= maxLen then
-        table.insert(chunks, text)
-        return chunks
-    end
-
-    local remaining = text
-    while #remaining > 0 do
-        if #remaining <= maxLen then
-            table.insert(chunks, remaining)
-            break
-        end
-
-        -- Try to find a good break point (sentence end, comma, space)
-        local breakPos = maxLen
-        local searchStart = math.max(1, maxLen - 100)
-
-        -- Look for sentence endings
-        for pos = maxLen, searchStart, -1 do
-            local c = remaining:sub(pos, pos)
-            if c == "." or c == "!" or c == "?" or c == ";" then
-                breakPos = pos
-                break
-            end
-        end
-
-        -- If no sentence end, try comma or space
-        if breakPos == maxLen then
-            for pos = maxLen, searchStart, -1 do
-                local c = remaining:sub(pos, pos)
-                if c == "," or c == " " or c == "\n" then
-                    breakPos = pos
-                    break
-                end
-            end
-        end
-
-        table.insert(chunks, remaining:sub(1, breakPos))
-        remaining = remaining:sub(breakPos + 1)
-    end
-
-    return chunks
+local function getProvider()
+    local cfg = AppStoreConfig.translator or {}
+    return cfg.provider or "openai_compatible"
 end
 
---- Translate text from source language to target language
---- Returns translated text or nil, error message
-function Translator.translate(text, sourceLang, targetLang)
+function Translator.translate(text, source_lang, target_lang)
     if not text or text == "" then
         return ""
     end
 
-    -- Check cache first
-    local cached = readCache(text)
+    local provider = getProvider()
+    local cached = readCache(text, provider)
     if cached then
         return cached
     end
 
-    sourceLang = sourceLang or "en"
-    targetLang = targetLang or "zh-CN"
+    source_lang = source_lang or "en"
+    target_lang = target_lang or "Simplified Chinese"
 
-    -- Split into chunks for long texts
-    local chunks = splitIntoChunks(text)
-    local translatedParts = {}
+    local max_len = provider == "mymemory" and MYMEMORY_CHUNK_LEN or OPENAI_CHUNK_LEN
+    local chunks = splitIntoChunks(text, max_len)
+    local translated_parts = {}
 
     for i, chunk in ipairs(chunks) do
-        local result, err = translateChunk(chunk, sourceLang, targetLang)
-        if result then
-            table.insert(translatedParts, result)
+        local result, err
+        if provider == "mymemory" then
+            result, err = translateMyMemoryChunk(chunk, source_lang, "zh-CN")
         else
-            logger.warn("Translator chunk failed:", i, err)
-            -- Use original text as fallback
-            table.insert(translatedParts, chunk)
+            result, err = translateOpenAIChunk(chunk, source_lang, target_lang)
         end
-
-        -- Small delay between chunks to avoid rate limiting
-        if i < #chunks then
-            -- KOReader doesn't have a simple sleep, but HTTP request latency provides natural spacing
+        if not result then
+            logger.warn("AppStore translator chunk failed", provider, i, err)
+            return nil, err or "translation failed"
         end
+        table.insert(translated_parts, result)
     end
 
-    local fullTranslation = table.concat(translatedParts)
-
-    -- Cache the result
-    if fullTranslation and fullTranslation ~= "" then
-        writeCache(text, fullTranslation)
+    local full_translation = table.concat(translated_parts, "\n\n")
+    if full_translation and full_translation ~= "" then
+        writeCache(text, provider, full_translation)
     end
-
-    return fullTranslation
+    return full_translation
 end
 
---- Check if text appears to be non-Chinese (needs translation)
 function Translator.needsTranslation(text)
     if not text or text == "" then
         return false
     end
-    -- Count Chinese characters
-    local chineseCount = 0
-    local totalCount = 0
+    local chinese_count = 0
+    local total_count = 0
     for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-        totalCount = totalCount + 1
+        total_count = total_count + 1
         local byte = string.byte(char, 1)
         if byte >= 0xE4 and byte <= 0xE9 then
-            -- Likely Chinese character (UTF-8 range for CJK)
-            chineseCount = chineseCount + 1
+            chinese_count = chinese_count + 1
         end
     end
-
-    -- If less than 10% Chinese, consider it needs translation
-    return totalCount > 0 and (chineseCount / totalCount) < 0.1
+    return total_count > 0 and (chinese_count / total_count) < 0.1
 end
 
---- Clear translation cache
 function Translator.clearCache()
     ensureCacheDir()
     local removed = 0
