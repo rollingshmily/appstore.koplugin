@@ -1860,7 +1860,7 @@ function AppStore:checkAllUpdates()
                 return nil, "Missing repository metadata for remote fetch."
             end
             branch = branch or "HEAD"
-            local url = string.format("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo_name, branch, path)
+            local url = GitHub.proxyUrl(string.format("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo_name, branch, path))
             local response = {}
             local _, code = http.request{
                 url = url,
@@ -3325,7 +3325,7 @@ fetchGitHubRaw = function(owner, repo_name, branch, path)
         return nil, _("Missing repository metadata for remote fetch.")
     end
     branch = branch or "HEAD"
-    local url = string.format("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo_name, branch, path)
+    local url = GitHub.proxyUrl(string.format("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo_name, branch, path))
     local response = {}
     local _, code = http.request{
         url = url,
@@ -4397,7 +4397,7 @@ function AppStore:installPluginFromReleaseAsset(repo, release, asset)
         return
     end
 
-    local url = asset.browser_download_url
+    local url = GitHub.proxyUrl(asset.browser_download_url or "")
     if not url or url == "" then
         UIManager:show(InfoMessage:new{ text = _("Missing download URL for release asset."), timeout = 4 })
         return
@@ -4563,13 +4563,13 @@ local function buildPatchDownloadUrl(owner, repo_name, branch, path)
         return nil
     end
     branch = branch or "HEAD"
-    return string.format(
+    return GitHub.proxyUrl(string.format(
         "https://raw.githubusercontent.com/%s/%s/%s/%s",
         owner,
         repo_name,
         branch,
         path
-    )
+    ))
 end
 
 ensurePatchesDir = function()
@@ -6828,7 +6828,7 @@ function AppStore:_installPluginFromRepoInternal(repo)
         return
     end
 
-    local url = string.format("https://api.github.com/repos/%s/%s/zipball", owner, repo.name)
+    local url = GitHub.proxyUrl(string.format("https://api.github.com/repos/%s/%s/zipball", owner, repo.name))
 
     local cache_dir = ensureCacheDir()
     local downloads_dir = cache_dir .. "/downloads"

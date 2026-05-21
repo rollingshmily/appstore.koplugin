@@ -8,5 +8,9 @@ return {
             token = "your_github_token",
         },
     },
+    -- GitHub proxy for users in regions with restricted access to GitHub.
+    -- Leave empty or nil to connect directly.
+    -- Example: "https://gh-proxy.com"
+    proxy_url = "",
 }
 

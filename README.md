@@ -1,16 +1,33 @@
-# App Store Plugin for KOReader
+# App Store Plugin for KOReader (China/GitHub Proxy Edition)
+
+> **Fork of [omer-faruq/appstore.koplugin](https://github.com/omer-faruq/appstore.koplugin)** with built-in GitHub proxy support for users in regions with restricted GitHub access.
 
 Discover, install, and update community-created KOReader plugins and user patches without leaving your device. The AppStore plugin searches both GitHub topics (`koreader-plugin`, `koreader-user-patch`) and repositories whose names follow patterns like `"KOReader.patches"` or `"[NAME].plugins"`. The plugin supports standard owner/topic/description filters, surfacing curated lists with filtering, sorting, and hands-on install flows that feel native on e-ink hardware.
 
+## What's Different in This Fork
+
+- **GitHub Proxy Support**: All network requests (GitHub API, raw file downloads, zip archives) can be routed through a proxy like [gh-proxy.com](https://gh-proxy.com) to bypass GitHub access restrictions.
+- **Zero Config**: Just set `proxy_url` in the configuration file and everything works.
+- **Upstream Compatible**: All changes are backward-compatible. If `proxy_url` is empty or missing, the plugin connects directly to GitHub.
+
 ## Installation
 
-1. Download the latest release from the [releases page](https://github.com/omer-faruq/appstore.koplugin/releases) or clone this repository.
+1. Download the latest release from the [releases page](https://github.com/rollingshmily/appstore.koplugin/releases) or clone this repository.
 2. Copy the `appstore.koplugin` folder to your KOReader's `plugins` directory:
    - **Kobo/Kindle**: `koreader/plugins/`
    - **Android**: `/sdcard/koreader/plugins/`
    - **Desktop (Linux)**: `~/.config/koreader/plugins/`
 3. Restart KOReader.
 4. Access via **Tools** → **App Store**.
+
+## Quick Setup for China/Mainland Users
+
+1. Copy `appstore_configuration.sample.lua` to `appstore_configuration.lua` in the same directory.
+2. Edit `appstore_configuration.lua` and set:
+   ```lua
+   proxy_url = "https://gh-proxy.com"
+   ```
+3. Restart KOReader. All GitHub requests will now go through the proxy.
 
 ## Key Capabilities
 

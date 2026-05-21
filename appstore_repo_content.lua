@@ -9,7 +9,19 @@ local util = require("util")
 local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 
+local ok_cfg, AppStoreConfig = pcall(require, "appstore_configuration")
+if not ok_cfg then
+    AppStoreConfig = {}
+end
+
 local RepoContent = {}
+
+local function proxyUrl(raw_url)
+    if AppStoreConfig.proxy_url and AppStoreConfig.proxy_url ~= "" then
+        return AppStoreConfig.proxy_url .. "/" .. raw_url
+    end
+    return raw_url
+end
 
 local function getCacheDir()
     local dir = DataStorage:getDataDir() .. "/cache/appstore/readme"
@@ -21,7 +33,7 @@ local function getCacheDir()
 end
 
 local function buildRawUrl(owner, repo)
-    return string.format("https://raw.githubusercontent.com/%s/%s/HEAD/README.md", owner, repo)
+    return proxyUrl(string.format("https://raw.githubusercontent.com/%s/%s/HEAD/README.md", owner, repo))
 end
 
 local function download(url)

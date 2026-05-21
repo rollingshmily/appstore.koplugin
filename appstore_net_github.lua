@@ -10,8 +10,16 @@ end
 
 local GitHubClient = {}
 
-local BASE_URL = "https://api.github.com"
+local RAW_BASE_URL = "https://api.github.com"
 local USER_AGENT = "KOReader-AppStore"
+
+--- Wrap a URL with the configured proxy prefix when proxy_url is set.
+function GitHubClient.proxyUrl(raw_url)
+    if AppStoreConfig.proxy_url and AppStoreConfig.proxy_url ~= "" then
+        return AppStoreConfig.proxy_url .. "/" .. raw_url
+    end
+    return raw_url
+end
 
 local function joinQueryParts(parts)
     if not parts or #parts == 0 then
@@ -46,7 +54,7 @@ end
 
 local function request(path, query)
     local response_body = {}
-    local target = BASE_URL .. path
+    local target = GitHubClient.proxyUrl(RAW_BASE_URL .. path)
     if query and query ~= "" then
         target = target .. "?" .. query
     end
