@@ -6,6 +6,7 @@ local logger = require("logger")
 local DataStorage = require("datastorage")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
+local LuaSettings = require("luasettings")
 
 local ok_cfg, AppStoreConfig = pcall(require, "appstore_configuration")
 if not ok_cfg then
@@ -13,6 +14,10 @@ if not ok_cfg then
 end
 
 local Translator = {}
+
+local SETTINGS_PATH = DataStorage:getSettingsDir() .. "/appstore.lua"
+local AppStoreSettings = LuaSettings:open(SETTINGS_PATH)
+local TRANSLATOR_SETTINGS_KEY = "translator_provider_settings"
 
 local CACHE_DIR = DataStorage:getDataDir() .. "/cache/appstore/translations"
 local MYMEMORY_API_URL = "https://api.mymemory.translated.net/get"
@@ -122,14 +127,16 @@ end
 local function getOpenAISettings()
     local cfg = AppStoreConfig.translator or {}
     local openai = cfg.openai_compatible or cfg.openai or {}
+    local saved = AppStoreSettings:readSetting(TRANSLATOR_SETTINGS_KEY) or {}
+    local additional = saved.additional_parameters or openai.additional_parameters or {}
     return {
-        provider = "openai_compatible",
-        base_url = openai.base_url or "https://openrouter.ai/api/v1/chat/completions",
-        api_key = openai.api_key or "",
-        model = openai.model or "qwen/qwen3-14b:free",
-        max_tokens = openai.max_tokens or 8192,
-        temperature = openai.temperature or 0.2,
-        extra_headers = openai.extra_headers or {},
+        provider = saved.provider or openai.provider or "openai_compatible",
+        base_url = saved.base_url or openai.base_url or "https://openrouter.ai/api/v1/chat/completions",
+        api_key = saved.api_key or openai.api_key or "",
+        model = saved.model or openai.model or "qwen/qwen3-14b:free",
+        max_tokens = additional.max_tokens or openai.max_tokens or 8192,
+        temperature = additional.temperature or openai.temperature or 0.2,
+        extra_headers = saved.extra_headers or openai.extra_headers or {},
     }
 end
 
@@ -205,8 +212,26 @@ local function translateMyMemoryChunk(text, source_lang, target_lang)
 end
 
 local function getProvider()
+    local saved = AppStoreSettings:readSetting(TRANSLATOR_SETTINGS_KEY) or {}
+    if saved.api_key and saved.api_key ~= "" then
+        return saved.provider or "openai_compatible"
+    end
     local cfg = AppStoreConfig.translator or {}
     return cfg.provider or "openai_compatible"
+end
+
+local function getCacheProviderKey(provider)
+    if provider ~= "mymemory" then
+        local settings = getOpenAISettings()
+        return table.concat({
+            tostring(provider or "openai_compatible"),
+            tostring(settings.base_url or ""),
+            tostring(settings.model or ""),
+            tostring(settings.temperature or ""),
+            tostring(settings.max_tokens or ""),
+        }, "|")
+    end
+    return provider
 end
 
 function Translator.translate(text, source_lang, target_lang)
@@ -215,7 +240,8 @@ function Translator.translate(text, source_lang, target_lang)
     end
 
     local provider = getProvider()
-    local cached = readCache(text, provider)
+    local cache_provider = getCacheProviderKey(provider)
+    local cached = readCache(text, cache_provider)
     if cached then
         return cached
     end
@@ -243,7 +269,7 @@ function Translator.translate(text, source_lang, target_lang)
 
     local full_translation = table.concat(translated_parts, "\n\n")
     if full_translation and full_translation ~= "" then
-        writeCache(text, provider, full_translation)
+        writeCache(text, cache_provider, full_translation)
     end
     return full_translation
 end

@@ -69,6 +69,7 @@ local PLUGIN_NAME_QUERIES = { 'in:name ".koplugin"' }
 local PATCH_NAME_QUERIES = { 'in:name "KOReader.patches"' }
 local BROWSER_STATE_KEY = "browser_state"
 local INCLUDE_ZERO_STAR_FORKS_KEY = "include_zero_star_forks"
+local TRANSLATOR_SETTINGS_KEY = "translator_provider_settings"
 local PATCH_CACHE_TTL = 10 * 60
 local DEFAULT_SORT_MODE = "stars_desc"
 
@@ -132,27 +133,6 @@ local extractReleaseNameFallback
 local detectPluginFromArchiveWithFallback
 local renderReleaseNotesText
 local softWrapLongTokens
-
-local function buildPatchRepoDescriptor(record)
-    if not record or not record.owner or not record.repo then
-        return nil
-    end
-
-    local owner = record.owner
-    return {
-        kind = "patch",
-        name = record.repo,
-        owner = owner,
-        full_name = record.repo_full_name or string.format("%s/%s", owner, record.repo),
-        id = record.repo_id,
-        repo_id = record.repo_id,
-        description = record.repo_description,
-        data = {
-            owner = { login = owner },
-            default_branch = record.branch or "HEAD",
-        },
-    }
-end
 
 softWrapLongTokens = function(text, max_len)
     max_len = tonumber(max_len) or 60
@@ -5630,17 +5610,11 @@ function AppStore:buildBrowserEntries()
     end
 
     table.insert(items, {
-        text = self:getFilterSummary(),
+        text = string.format(_("%s · %s (hold to sort)"), self:getFilterSummary(), self:getSortSummary()),
         callback = function()
             self:showFilterDialog()
         end,
-        keep_menu_open = true,
-    })
-    items[#items].separator = true
-
-    table.insert(items, {
-        text = self:getSortSummary(),
-        callback = function()
+        hold_callback = function()
             self:advanceSortMode()
         end,
         keep_menu_open = true,
@@ -5648,17 +5622,6 @@ function AppStore:buildBrowserEntries()
     items[#items].separator = true
 
     local filtered, total = self:getFilteredDescriptors(kind)
-    table.insert(items, {
-        text = self:getCacheStatusLine(kind, total),
-        select_enabled = false,
-    })
-    local warning = self:getCacheWarning(kind)
-    if warning then
-        table.insert(items, {
-            text = warning,
-            select_enabled = false,
-        })
-    end
     local patch_display_entries
     if kind == "patch" then
         patch_display_entries = self:collectPatchEntries(filtered)
@@ -5671,9 +5634,16 @@ function AppStore:buildBrowserEntries()
         match_line = string.format(_("Matching entries: %s / %s"), tostring(#filtered), tostring(total))
     end
     table.insert(items, {
-        text = match_line,
+        text = self:getCacheStatusLine(kind, total) .. "\n" .. match_line,
         select_enabled = false,
     })
+    local warning = self:getCacheWarning(kind)
+    if warning then
+        table.insert(items, {
+            text = warning,
+            select_enabled = false,
+        })
+    end
     items[#items].separator = true
 
     local total_pages = math.max(1, math.ceil(display_total / BROWSER_PAGE_SIZE))
@@ -5955,6 +5925,92 @@ function AppStore:showFilterDialog()
     dialog:onShowKeyboard()
 end
 
+function AppStore:showTranslatorSettingsDialog()
+    local cfg = AppStoreSettings:readSetting(TRANSLATOR_SETTINGS_KEY) or {}
+    local additional = cfg.additional_parameters or {}
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("README translation model"),
+        fields = {
+            {
+                description = _("Provider name"),
+                text = cfg.provider or "openrouter",
+                hint = _("e.g., openrouter"),
+            },
+            {
+                description = _("Model"),
+                text = cfg.model or "qwen/qwen3-14b:free",
+                hint = _("e.g., qwen/qwen3-14b:free"),
+            },
+            {
+                description = _("Base URL"),
+                text = cfg.base_url or "https://openrouter.ai/api/v1/chat/completions",
+                hint = "https://openrouter.ai/api/v1/chat/completions",
+            },
+            {
+                description = _("API key"),
+                text = cfg.api_key or "",
+                hint = _("Bearer token for the provider"),
+            },
+            {
+                description = _("Max tokens"),
+                input_type = "number",
+                text = tostring(additional.max_tokens or 8192),
+                hint = "8192",
+            },
+            {
+                description = _("Temperature"),
+                text = tostring(additional.temperature or 0.2),
+                hint = "0.2",
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    background = Blitbuffer.COLOR_WHITE,
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Reset"),
+                    background = Blitbuffer.COLOR_WHITE,
+                    callback = function()
+                        AppStoreSettings:delSetting(TRANSLATOR_SETTINGS_KEY)
+                        AppStoreSettings:flush()
+                        UIManager:close(dialog)
+                        UIManager:show(InfoMessage:new{ text = _("Translation model reset."), timeout = 3 })
+                    end,
+                },
+                {
+                    text = _("Save"),
+                    background = Blitbuffer.COLOR_WHITE,
+                    is_enter_default = true,
+                    callback = function()
+                        local fields = dialog:getFields()
+                        AppStoreSettings:saveSetting(TRANSLATOR_SETTINGS_KEY, {
+                            provider = util.trim(fields[1] or ""),
+                            model = util.trim(fields[2] or ""),
+                            base_url = util.trim(fields[3] or ""),
+                            api_key = util.trim(fields[4] or ""),
+                            additional_parameters = {
+                                max_tokens = tonumber(fields[5]) or 8192,
+                                temperature = tonumber(fields[6]) or 0.2,
+                            },
+                        })
+                        AppStoreSettings:flush()
+                        UIManager:close(dialog)
+                        UIManager:show(InfoMessage:new{ text = _("Translation model saved."), timeout = 3 })
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
 function AppStore:showAppStoreSettingsDialog()
     -- Opened via the gear icon on the browser title bar.
     -- Keep the toggle list minimal; additional settings can be added below as
@@ -5965,6 +6021,16 @@ function AppStore:showAppStoreSettingsDialog()
     local current_kind = (self.browser_state and self.browser_state.kind) or "plugin"
     local dialog
     local buttons = {
+        {
+            {
+                text = _("README translation model"),
+                background = Blitbuffer.COLOR_WHITE,
+                callback = function()
+                    UIManager:close(dialog)
+                    self:showTranslatorSettingsDialog()
+                end,
+            },
+        },
         {
             {
                 text = string.format("%s  %s", mark, _("Include 0-star forks")),
@@ -7122,6 +7188,15 @@ local AppStoreReadmeDialog = FocusManager:extend{
     page = 1,
 }
 
+function AppStoreReadmeDialog:getPageTitle()
+    local page_count = #(self.pages or {})
+    local page_title = self.title or _("README")
+    if page_count > 1 then
+        page_title = string.format("%s (%d/%d)", page_title, self.page or 1, page_count)
+    end
+    return page_title
+end
+
 function AppStoreReadmeDialog:init()
     self.show_parent = self
     local screen_w = Device.screen:getWidth()
@@ -7135,43 +7210,22 @@ function AppStoreReadmeDialog:init()
         end
     end
 
-    local page_count = #(self.pages or {})
-    local page_title = self.title or _("README")
-    if page_count > 1 then
-        page_title = string.format("%s (%d/%d)", page_title, self.page or 1, page_count)
-    end
-    local translate_button = Button:new{
-        text = (self.mode == "translated") and _("原") or _("译"),
-        menu_style = true,
-        bordersize = 0,
-        background = Blitbuffer.COLOR_WHITE,
-        callback = function()
+    self.title_bar = TitleBar:new{
+        width = screen_w,
+        title = self:getPageTitle(),
+        fullscreen = false,
+        with_bottom_line = true,
+        left_icon = "appbar.settings",
+        left_icon_tap_callback = function()
             self:onTranslateButton()
         end,
-    }
-    local close_button = Button:new{
-        text = "✕",
-        menu_style = true,
-        bordersize = 0,
-        background = Blitbuffer.COLOR_WHITE,
-        callback = function()
+        close_callback = function()
             UIManager:close(self)
         end,
-    }
-    self.header = HorizontalGroup:new{
-        translate_button,
-        HorizontalSpan:new{ width = Size.span.horizontal_default },
-        TextWidget:new{
-            text = page_title,
-            width = screen_w - translate_button:getSize().w - close_button:getSize().w - 4 * Size.span.horizontal_default,
-            face = Font:getFace("smallinfofont"),
-        },
-        HorizontalSpan:new{ width = Size.span.horizontal_default },
-        close_button,
+        show_parent = self,
     }
 
-    local content_width = math.floor(screen_w * 0.96)
-    local content_height = screen_h - self.header:getSize().h - Size.padding.default
+    local content_height = screen_h - self.title_bar:getHeight()
     local face = TextWidget.getDefaultFace and TextWidget:getDefaultFace()
     if not face and Font and Font.getFace then
         face = Font:getFace("infofont")
@@ -7179,7 +7233,7 @@ function AppStoreReadmeDialog:init()
     local page_text = (self.pages and self.pages[self.page or 1]) or ""
     local box = TextBoxWidget:new{
         text = softWrapLongTokens(page_text, 100),
-        width = content_width - 2 * Size.padding.default,
+        width = screen_w - 2 * Size.padding.default,
         face = face,
     }
     local frame = FrameContainer:new{
@@ -7199,13 +7253,17 @@ function AppStoreReadmeDialog:init()
         padding = 0,
         dimen = self.dimen:copy(),
         VerticalGroup:new{
-            self.header,
-            CenterContainer:new{
-                dimen = Geom:new{ w = screen_w, h = content_height },
-                self.scroller,
-            },
+            self.title_bar,
+            self.scroller,
         },
     }
+    self.layout = {}
+    if self.title_bar.generateHorizontalLayout then
+        local title_rows = self.title_bar:generateHorizontalLayout()
+        for _, row in ipairs(title_rows) do
+            table.insert(self.layout, row)
+        end
+    end
 end
 
 function AppStoreReadmeDialog:onClose()
