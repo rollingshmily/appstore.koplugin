@@ -7036,6 +7036,57 @@ function AppStore:showReadme(repo)
     end)
 end
 
+local function formatReadmeForTextBox(text)
+    text = tostring(text or "")
+    text = text:gsub("\r\n", "\n"):gsub("\r", "\n")
+    text = text:gsub("<br%s*/?>", "\n")
+    text = text:gsub("<[^>]+>", "")
+    text = text:gsub("!%[([^%]]*)%]%([^%)]+%)", "[Image: %1]")
+    text = text:gsub("%[([^%]]+)%]%(([^%)]+)%)", "%1 (%2)")
+
+    local lines = {}
+    local in_code = false
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+        local fence = line:match("^%s*```") or line:match("^%s*~~~")
+        if fence then
+            in_code = not in_code
+            if in_code then
+                table.insert(lines, "")
+                table.insert(lines, "    ─── code ───")
+            else
+                table.insert(lines, "    ───────────")
+                table.insert(lines, "")
+            end
+        elseif in_code then
+            table.insert(lines, "    " .. line)
+        else
+            local hashes, heading_text = line:match("^%s*(#+)%s+(.+)$")
+            if hashes and heading_text then
+                table.insert(lines, "")
+                table.insert(lines, heading_text)
+                table.insert(lines, ("─"):rep(math.min(#heading_text, 28)))
+                table.insert(lines, "")
+            else
+                line = line:gsub("^%s*[%-%*+]%s+", "  • ")
+                line = line:gsub("^%s*(%d+)%.%s+", "  %1. ")
+                line = line:gsub("%*%*([^%*]+)%*%*", "%1")
+                line = line:gsub("__([^_]+)__", "%1")
+                line = line:gsub("`([^`]+)`", "‹%1›")
+                if line:match("^%s*[-=][-=][-=]+%s*$") then
+                    table.insert(lines, "────────────────")
+                else
+                    table.insert(lines, line)
+                end
+            end
+        end
+    end
+
+    text = table.concat(lines, "\n")
+    text = text:gsub("\n\n\n+", "\n\n")
+    text = text:gsub("^\n+", ""):gsub("\n+$", "")
+    return text
+end
+
 local function splitReadmePages(text, max_len)
     max_len = max_len or 6000
     local pages = {}
@@ -7187,7 +7238,8 @@ function AppStore:showReadmeDialog(title, text)
         UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
         return
     end
-    local pages = splitReadmePages(text, 6000)
+    local formatted = formatReadmeForTextBox(text)
+    local pages = splitReadmePages(formatted, 6000)
     UIManager:show(AppStoreReadmeDialog:new{
         appstore = self,
         title = title or _("README"),
