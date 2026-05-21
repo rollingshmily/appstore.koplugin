@@ -1,7 +1,6 @@
 ﻿local DataStorage = require("datastorage")
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
-local FileManager = require("apps/filemanager/filemanager")
 local _ = require("appstore_gettext")
 local http = require("socket.http")
 local ltn12 = require("ltn12")
@@ -107,17 +106,15 @@ function RepoContent.clearReadmeCache()
     return { removed = removed, errors = errors }
 end
 
-function RepoContent.openReadme(path)
+function RepoContent.readReadme(path)
     if not path then
-        UIManager:show(InfoMessage:new{ text = _("Missing README path"), timeout = 4 })
-        return
+        return nil, _("Missing README path")
     end
-    local text, err = util.readFromFile(path)
+    local text = util.readFromFile(path)
     if not text or text == "" then
-        UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
-        return
+        return nil, _("Unable to read README file")
     end
-    FileManager:openFile(path)
+    return text
 end
 
 return RepoContent

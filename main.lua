@@ -7034,18 +7034,49 @@ function AppStore:showReadme(repo)
     end)
 end
 
+function AppStore:showReadmeDialog(title, text)
+    if not text or text == "" then
+        UIManager:show(InfoMessage:new{ text = _("Unable to read README file"), timeout = 4 })
+        return
+    end
+    local dialog
+    dialog = ConfirmBox:new{
+        text = title or _("README"),
+        cancel_text = _("Close"),
+        no_ok_button = true,
+    }
+    dialog:addWidget(makeScrollableTextBoxForDialog(dialog, softWrapLongTokens(text, 80)))
+    UIManager:show(dialog)
+end
+
+function AppStore:openReadmeInDialog(path, repo, text_override)
+    local text = text_override
+    if not text then
+        local err
+        text, err = RepoContent.readReadme(path)
+        if not text then
+            UIManager:show(InfoMessage:new{ text = tostring(err), timeout = 4 })
+            return
+        end
+    end
+    local owner = repo and (repo.owner or (repo.data and repo.data.owner and repo.data.owner.login))
+    local repo_name = repo and repo.name
+    local title = (owner and repo_name) and string.format("%s/%s · README", owner, repo_name) or _("README")
+    self:showReadmeDialog(title, text)
+end
+
 function AppStore:showReadmeWithTranslation(path, repo)
     -- Read the file to check if translation is needed
     local text, err = util.readFromFile(path)
     if not text or text == "" then
-        RepoContent.openReadme(path)
+        self:openReadmeInDialog(path, repo)
         return
     end
 
     -- Check if text needs translation
     if not Translator.needsTranslation(text) then
         -- Already Chinese, open directly
-        RepoContent.openReadme(path)
+        self:openReadmeInDialog(path, repo)
         return
     end
 
@@ -7058,7 +7089,7 @@ function AppStore:showReadmeWithTranslation(path, repo)
                 background = Blitbuffer.COLOR_WHITE,
                 callback = function()
                     UIManager:close(dialog)
-                    RepoContent.openReadme(path)
+                    self:openReadmeInDialog(path, repo)
                 end,
             },
         },
@@ -7113,7 +7144,7 @@ function AppStore:translateAndShowReadme(path, text, repo)
     end
 
     UIManager:show(InfoMessage:new{ text = _("Translation failed. Showing original."), timeout = 4 })
-    RepoContent.openReadme(path)
+    self:openReadmeInDialog(path, repo)
 end
 
 function AppStore:showTranslatedReadme(translatedText, repo)
@@ -7132,7 +7163,7 @@ function AppStore:showTranslatedReadme(translatedText, repo)
         return
     end
 
-    RepoContent.openReadme(path)
+    self:openReadmeInDialog(path, repo, translatedText)
 end
 
 local function appendUniqueRepo(target, seen, repo)
