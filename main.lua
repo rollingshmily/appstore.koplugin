@@ -7647,18 +7647,9 @@ function AppStore:downloadAndInstallUpdate(url)
         return
     end
 
-    -- Extract to plugins directory
     local plugins_dir = DataStorage:getDataDir() .. "/plugins"
     local target_dir = plugins_dir .. "/appstore.koplugin"
-    local backup_dir = target_dir .. ".bak"
 
-    -- Backup current version
-    if lfs.attributes(target_dir, "mode") == "directory" then
-        deleteDirectoryRecursive(backup_dir)
-        os.rename(target_dir, backup_dir)
-    end
-
-    -- Extract
     local reader = Archiver.Reader:new()
     if not reader:open(zip_path) then
         util.removeFile(zip_path)
@@ -7701,9 +7692,6 @@ function AppStore:downloadAndInstallUpdate(url)
 
     reader:close()
     util.removeFile(zip_path)
-
-    -- Clean up backup
-    deleteDirectoryRecursive(backup_dir)
 
     UIManager:show(InfoMessage:new{
         text = string.format(_("AppStore updated successfully! %d files extracted.\nPlease restart KOReader."), extracted),
